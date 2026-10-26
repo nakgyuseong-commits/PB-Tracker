@@ -392,7 +392,7 @@
 
     // Upload Image to Supabase Storage 'certificates' bucket
     async function uploadCertToSupabase(id, dataUrl) {
-      if (!supabaseClient || !dataUrl.startsWith("data:")) return dataUrl;
+      if (!supabaseClient || !dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
       try {
         const blob = dataURLtoBlob(dataUrl);
         const fileName = `${id}_${Date.now()}.png`;
@@ -402,17 +402,18 @@
 
         if (error) {
           console.warn("Supabase storage upload error:", error);
-          return dataUrl;
+          // If storage bucket blocked by RLS, don't crash - return null for image URL so DB upsert still works!
+          return null;
         }
 
         const { data: pubData } = supabaseClient.storage
           .from('certificates')
           .getPublicUrl(fileName);
 
-        return pubData ? pubData.publicUrl : dataUrl;
+        return pubData ? pubData.publicUrl : null;
       } catch (err) {
         console.error("Storage upload exception:", err);
-        return dataUrl;
+        return null;
       }
     }
 
@@ -729,7 +730,16 @@
         hasCert: Boolean(finalCertUrl)
       };
 
-      // 1. Save to Supabase Cloud DB
+      // 1. Always save locally first so user NEVER loses data!
+      if (currentEditingId) {
+        records = records.map(r => r.id === currentEditingId ? recData : r);
+      } else {
+        records.unshift(recData);
+      }
+      saveState();
+
+      // 2. Save to Supabase Cloud DB
+      let cloudSuccess = false;
       if (supabaseClient) {
         try {
           const dbRow = {
@@ -751,22 +761,22 @@
             .from('marathon_records')
             .upsert(dbRow, { onConflict: 'id' });
 
-          if (error) console.error("Supabase upsert error:", error);
+          if (error) {
+            console.error("Supabase upsert error:", error);
+            alert("⚠️ 클라우드 저장 실패: " + (error.message || JSON.stringify(error)) + "\n(기록은 우선 스마트폰 로컬에 안전하게 보관되었습니다)");
+          } else {
+            cloudSuccess = true;
+          }
         } catch (err) {
           console.error("Cloud save error:", err);
+          alert("⚠️ 클라우드 통신 오류: " + err.message + "\n(스마트폰 로컬에는 저장되었습니다)");
         }
       }
 
-      // 2. Update local in-memory array & cache
-      if (currentEditingId) {
-        records = records.map(r => r.id === currentEditingId ? recData : r);
-      } else {
-        records.push(recData);
+      if (statusBadge) {
+        statusBadge.innerHTML = cloudSuccess ? "☁️ 클라우드 동기화 완료" : "⚠️ 로컬 보관 (동기화 재시도)";
       }
-
-      if (statusBadge) statusBadge.innerHTML = "☁️ 클라우드 동기화 완료";
       closeInputModal();
-      saveState();
     }
 
     async function deleteRecord(id) {
