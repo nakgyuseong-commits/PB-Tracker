@@ -97,6 +97,40 @@
     .auth-tab-btn { flex: 1; padding: 10px; font-weight: 700; font-size: 13px; background: transparent; border: none; color: #9ca3af; border-bottom: 2px solid transparent; cursor: pointer; }
     .auth-tab-btn.active { color: #10b981; border-bottom: 2px solid #10b981; }
 
+  
+    /* Main Navigation Tabs */
+    .main-nav { display: flex; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid #1f2937; padding-bottom: 2px; }
+    .nav-tab-btn { flex: 1; padding: 12px 6px; font-weight: 800; font-size: 13px; background: transparent; border: none; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; }
+    .nav-tab-btn.active { color: #10b981; border-bottom: 3px solid #10b981; }
+
+    /* Feed Filter Sub-tabs */
+    .feed-sub-nav { display: flex; gap: 6px; margin-bottom: 14px; }
+    .sub-filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #111827; color: #94a3b8; border: 1px solid #1f2937; cursor: pointer; }
+    .sub-filter-btn.active { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
+
+    /* Feed Card Styles */
+    .feed-card { background: #111827; border: 1px solid #1f2937; border-radius: 18px; padding: 16px; margin-bottom: 14px; }
+    .feed-author-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .feed-author-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .feed-avatar { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid #10b981; background: #030712; }
+    .feed-author-name { font-size: 14px; font-weight: 800; color: #ffffff; }
+    .feed-author-bio { font-size: 11px; color: #64748b; }
+    .feed-time-ago { font-size: 11px; color: #475569; }
+    
+    .feed-race-box { background: #090d16; border: 1px solid #1e293b; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .feed-cert-thumb { width: 100%; max-height: 280px; object-fit: contain; border-radius: 10px; background: #000; border: 1px solid #334155; margin-top: 10px; cursor: zoom-in; }
+    
+    .feed-interact-bar { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #1f2937; padding-top: 10px; margin-top: 10px; }
+    .clap-btn { background: #1f2937; border: none; color: #f1f5f9; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.15s; }
+    .clap-btn:active { transform: scale(0.95); }
+    .clap-btn.clapped { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+    /* Runner Explore List */
+    .runner-item { display: flex; align-items: center; justify-content: space-between; background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 12px; margin-bottom: 8px; }
+    .btn-follow { padding: 6px 14px; border-radius: 18px; font-size: 11px; font-weight: 800; border: none; cursor: pointer; }
+    .btn-follow.follow { background: #10b981; color: #022c22; }
+    .btn-follow.following { background: #1f2937; color: #94a3b8; border: 1px solid #374151; }
+
   </style>
 </head>
 <body>
@@ -142,8 +176,25 @@
       </div>
       <input type="file" id="hiddenOcrInput" accept="image/*" style="display:none;" onchange="handleOcrFile(this)">
     </header>
+    <!-- 메인 네비게이션 탭 -->
+    <nav class="main-nav">
+      <button class="nav-tab-btn active" id="tab-btn-archive" onclick="switchMainView('archive')">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        내 기록실
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-feed" onclick="switchMainView('feed')">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        뉴스피드
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-runners" onclick="switchMainView('runners')">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        러너 탐색
+      </button>
+    </nav>
 
-    <div class="section-title">완주 현황 및 종목별 PB</div>
+    <!-- 1. 내 아카이브 뷰 -->
+    <div id="view-archive">
+      <div class="section-title">완주 현황 및 종목별 PB</div>
     <div class="count-grid">
       <div class="count-card">
         <div class="count-label">10km 코스</div>
@@ -194,6 +245,29 @@
       <span style="font-size:11px;color:#6b7280;" id="rec-total-count">0개</span>
     </div>
     <div id="records-list"></div>
+  </div>
+    </div>
+
+    <!-- 2. 뉴스피드 뷰 -->
+    <div id="view-feed" style="display:none;">
+      <div class="feed-sub-nav">
+        <button class="sub-filter-btn active" id="sub-filter-all" onclick="setFeedFilter('all')">전체 러너 피드</button>
+        <button class="sub-filter-btn" id="sub-filter-following" onclick="setFeedFilter('following')">내가 팔로우한 러너</button>
+      </div>
+      <div id="feed-records-list">
+        <div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">피드를 불러오는 중...</div>
+      </div>
+    </div>
+
+    <!-- 3. 러너 탐색 뷰 -->
+    <div id="view-runners" style="display:none;">
+      <div style="margin-bottom:14px;">
+        <input type="text" id="runner-search-input" placeholder="러너 닉네임 검색..." class="form-input" oninput="filterRunnersList()">
+      </div>
+      <div id="runners-directory-list">
+        <div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">러너 목록을 불러오는 중...</div>
+      </div>
+    </div>
   </div>
 
   <!-- 등록 방식 선택 팝업 모달 -->
@@ -751,6 +825,339 @@
       updateAuthUI();
       closeProfileModal();
       alert("프로필이 업데이트되었습니다.");
+    }
+
+    
+    // Navigation & Feed / Social State
+    let currentMainView = 'archive';
+    let currentFeedFilter = 'all'; // 'all' or 'following'
+    let followingIds = new Set();
+    let communityProfiles = new Map();
+    let feedRecords = [];
+    let clappedRecordIds = new Set(JSON.parse(localStorage.getItem("clapped_records") || "[]"));
+
+    function switchMainView(view) {
+      currentMainView = view;
+      document.getElementById("tab-btn-archive").classList.toggle("active", view === 'archive');
+      document.getElementById("tab-btn-feed").classList.toggle("active", view === 'feed');
+      document.getElementById("tab-btn-runners").classList.toggle("active", view === 'runners');
+
+      document.getElementById("view-archive").style.display = view === 'archive' ? 'block' : 'none';
+      document.getElementById("view-feed").style.display = view === 'feed' ? 'block' : 'none';
+      document.getElementById("view-runners").style.display = view === 'runners' ? 'block' : 'none';
+
+      if (view === 'feed') {
+        loadFeed();
+      } else if (view === 'runners') {
+        loadRunnersDirectory();
+      }
+    }
+
+    function setFeedFilter(filter) {
+      currentFeedFilter = filter;
+      document.getElementById("sub-filter-all").classList.toggle("active", filter === 'all');
+      document.getElementById("sub-filter-following").classList.toggle("active", filter === 'following');
+      renderFeedUI();
+    }
+
+    // Follow / Social Database operations
+    async function fetchFollowingList() {
+      if (!currentUser || !supabaseClient) {
+        followingIds = new Set();
+        return;
+      }
+      try {
+        const { data, error } = await supabaseClient
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', currentUser.id);
+
+        if (!error && data) {
+          followingIds = new Set(data.map(f => f.following_id));
+        }
+      } catch (err) {
+        console.warn("Follows fetch error:", err);
+      }
+    }
+
+    async function toggleFollow(targetUserId, btnEl) {
+      if (!currentUser) {
+        alert("친구를 팔로우하려면 먼저 로그인해주세요!");
+        openAuthModal('login');
+        return;
+      }
+      if (targetUserId === currentUser.id) {
+        alert("본인은 팔로우할 수 없습니다.");
+        return;
+      }
+
+      const isFollowing = followingIds.has(targetUserId);
+      if (btnEl) btnEl.disabled = true;
+
+      try {
+        if (isFollowing) {
+          const { error } = await supabaseClient
+            .from('follows')
+            .delete()
+            .eq('follower_id', currentUser.id)
+            .eq('following_id', targetUserId);
+
+          if (!error) {
+            followingIds.delete(targetUserId);
+          }
+        } else {
+          const { error } = await supabaseClient
+            .from('follows')
+            .insert({
+              follower_id: currentUser.id,
+              following_id: targetUserId
+            });
+
+          if (!error) {
+            followingIds.add(targetUserId);
+          }
+        }
+      } catch (err) {
+        console.error("Toggle follow exception:", err);
+      }
+
+      if (btnEl) btnEl.disabled = false;
+      renderRunnersList();
+      if (currentMainView === 'feed') {
+        renderFeedUI();
+      }
+    }
+
+    // Load Newsfeed
+    async function loadFeed() {
+      const feedListEl = document.getElementById("feed-records-list");
+      feedListEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">피드를 불러오는 중...</div>';
+
+      await fetchFollowingList();
+
+      if (!supabaseClient) {
+        feedListEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">클라우드에 연결할 수 없습니다.</div>';
+        return;
+      }
+
+      try {
+        // 1. Fetch public marathon records (all runners)
+        const { data: rawRecs, error: recError } = await supabaseClient
+          .from('marathon_records')
+          .select('*')
+          .order('date', { ascending: false })
+          .limit(50);
+
+        if (recError || !rawRecs) {
+          feedListEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">피드 기록을 가져오지 못했습니다.</div>';
+          return;
+        }
+
+        // 2. Fetch profiles for all distinct user_ids
+        const uids = [...new Set(rawRecs.map(r => r.user_id).filter(Boolean))];
+        if (uids.length > 0) {
+          const { data: profs } = await supabaseClient
+            .from('profiles')
+            .select('id, nickname, avatar_url, bio')
+            .in('id', uids);
+
+          if (profs) {
+            profs.forEach(p => communityProfiles.set(p.id, p));
+          }
+        }
+
+        feedRecords = rawRecs;
+        renderFeedUI();
+      } catch (err) {
+        console.error("Load feed error:", err);
+        feedListEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">피드를 불러오는 중 오류가 발생했습니다.</div>';
+      }
+    }
+
+    function renderFeedUI() {
+      const feedListEl = document.getElementById("feed-records-list");
+      let filtered = feedRecords;
+
+      if (currentFeedFilter === 'following') {
+        if (!currentUser) {
+          feedListEl.innerHTML = `
+            <div style="text-align:center;padding:50px 20px;background:#111827;border-radius:18px;border:1px solid #1f2937;">
+              <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;">로그인이 필요합니다</div>
+              <div style="font-size:12px;color:#9ca3af;margin-bottom:16px;">팔로우한 러너의 피드를 보려면 로그인해주세요.</div>
+              <button class="btn btn-primary" onclick="openAuthModal('login')" style="margin:0 auto;display:inline-flex;">로그인하기</button>
+            </div>`;
+          return;
+        }
+        filtered = feedRecords.filter(r => r.user_id && followingIds.has(r.user_id));
+      }
+
+      if (filtered.length === 0) {
+        feedListEl.innerHTML = `
+          <div style="text-align:center;padding:50px 20px;background:#111827;border-radius:18px;border:1px solid #1f2937;">
+            <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:6px;">새로운 피드가 없습니다</div>
+            <div style="font-size:12px;color:#9ca3af;margin-bottom:14px;">${currentFeedFilter === 'following' ? '아직 팔로우한 러너가 없거나 새 기록이 없습니다. [러너 탐색]에서 친구를 팔로우해보세요!' : '등록된 마라톤 기록이 없습니다.'}</div>
+            ${currentFeedFilter === 'following' ? '<button class="btn btn-secondary" onclick="switchMainView(\'runners\')" style="margin:0 auto;display:inline-flex;">러너 탐색하러 가기</button>' : ''}
+          </div>`;
+        return;
+      }
+
+      feedListEl.innerHTML = filtered.map(r => {
+        const author = communityProfiles.get(r.user_id) || {
+          nickname: r.user_id ? "러너" : "익명 러너",
+          avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${r.user_id || 'anonymous'}`,
+          bio: "완주를 향해 달리는 러너"
+        };
+        const isFollowed = r.user_id ? followingIds.has(r.user_id) : false;
+        const isSelf = currentUser && r.user_id === currentUser.id;
+        const isClapped = clappedRecordIds.has(r.id);
+        const tStr = `${String(r.hours).padStart(2,'0')}:${String(r.minutes).padStart(2,'0')}:${String(r.seconds).padStart(2,'0')}`;
+        const tagClass = r.category === 'Full' ? 'tag-full' : (r.category === 'Half' ? 'tag-half' : 'tag-10k');
+
+        return `
+          <div class="feed-card">
+            <div class="feed-author-bar">
+              <div class="feed-author-info">
+                <img class="feed-avatar" src="${author.avatar_url}" alt="아바타">
+                <div>
+                  <div class="feed-author-name">${author.nickname} ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : ''}</div>
+                  <div class="feed-author-bio">${author.bio || '러닝으로 건강한 하루'}</div>
+                </div>
+              </div>
+              <div>
+                ${(!isSelf && r.user_id) ? `
+                  <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow('${r.user_id}', this)">
+                    ${isFollowed ? '팔로잉 ✓' : '+ 팔로우'}
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+
+            <div class="feed-race-box">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span class="tag ${tagClass}">${r.category} (${r.distance_km}km)</span>
+                <span style="font-size:11px;color:#64748b;">${r.date}</span>
+              </div>
+              <div style="font-size:16px;font-weight:800;color:#ffffff;margin-bottom:8px;">${r.name}</div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                <div style="font-size:24px;font-weight:900;color:#ffffff;font-variant-numeric:tabular-nums;">${tStr}</div>
+                <div style="font-size:12px;color:#10b981;font-weight:700;">평균 페이스 ${r.pace}</div>
+              </div>
+              ${r.notes ? `<div style="font-size:12px;color:#94a3b8;margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;">"${r.notes}"</div>` : ''}
+              ${r.cert_image_url ? `
+                <img class="feed-cert-thumb" src="${r.cert_image_url}" alt="완주 기록증" onclick="openCertDirectViewer('${r.cert_image_url}', '${r.name}')" title="기록증 원본 보기">
+              ` : ''}
+            </div>
+
+            <div class="feed-interact-bar">
+              <button class="clap-btn ${isClapped ? 'clapped' : ''}" onclick="toggleClap('${r.id}', this)">
+                👏 ${isClapped ? '완주 축하 완료!' : '완주 축하하기'}
+              </button>
+              <div style="font-size:11px;color:#64748b;">
+                ${r.bib ? `BIB ${r.bib}` : ''} ${r.weather ? `• ${r.weather}` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleClap(recId, btn) {
+      if (clappedRecordIds.has(recId)) {
+        clappedRecordIds.delete(recId);
+      } else {
+        clappedRecordIds.add(recId);
+      }
+      localStorage.setItem("clapped_records", JSON.stringify([...clappedRecordIds]));
+      btn.classList.toggle("clapped", clappedRecordIds.has(recId));
+      btn.innerHTML = clappedRecordIds.has(recId) ? '👏 완주 축하 완료!' : '👏 완주 축하하기';
+    }
+
+    function openCertDirectViewer(url, title) {
+      document.getElementById("cert-view-title").textContent = `${title} 완주 기록증`;
+      document.getElementById("cert-view-img").src = url;
+      const dlLink = document.getElementById("cert-download-link");
+      dlLink.href = url;
+      dlLink.download = `${title}_기록증.png`;
+      document.getElementById("cert-viewer-modal").style.display = "flex";
+    }
+
+    // Runner Directory
+    let allDirectoryRunners = [];
+
+    async function loadRunnersDirectory() {
+      const listEl = document.getElementById("runners-directory-list");
+      listEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">러너 목록을 불러오는 중...</div>';
+
+      await fetchFollowingList();
+
+      if (!supabaseClient) {
+        listEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">클라우드에 연결할 수 없습니다.</div>';
+        return;
+      }
+
+      try {
+        const { data, error } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (error || !data) {
+          listEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">러너 정보를 불러오지 못했습니다.</div>';
+          return;
+        }
+
+        allDirectoryRunners = data;
+        renderRunnersList();
+      } catch (err) {
+        console.error("Load directory error:", err);
+      }
+    }
+
+    function renderRunnersList() {
+      const listEl = document.getElementById("runners-directory-list");
+      const kw = (document.getElementById("runner-search-input").value || "").trim().toLowerCase();
+      
+      const filtered = allDirectoryRunners.filter(r => {
+        if (!kw) return true;
+        return (r.nickname && r.nickname.toLowerCase().includes(kw)) || (r.bio && r.bio.toLowerCase().includes(kw));
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">해당하는 러너가 없습니다.</div>';
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(r => {
+        const isFollowed = followingIds.has(r.id);
+        const isSelf = currentUser && r.id === currentUser.id;
+
+        return `
+          <div class="runner-item">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <img class="feed-avatar" src="${r.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + r.id}" alt="아바타">
+              <div>
+                <div style="font-size:14px;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:6px;">
+                  ${r.nickname || '러너'}
+                  ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : ''}
+                </div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${r.bio || '달리기를 사랑하는 러너'}</div>
+              </div>
+            </div>
+            <div>
+              ${!isSelf ? `
+                <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow('${r.id}', this)">
+                  ${isFollowed ? '팔로잉 ✓' : '+ 팔로우'}
+                </button>
+              ` : '<span style="font-size:11px;color:#64748b;padding:0 8px;">본인</span>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterRunnersList() {
+      renderRunnersList();
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
