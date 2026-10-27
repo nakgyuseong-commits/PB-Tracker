@@ -87,13 +87,49 @@
     .cert-preview-card { background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 10px; margin-top: 10px; text-align: center; }
     .cert-preview-card img { max-height: 220px; max-width: 100%; border-radius: 8px; border: 1px solid #334155; object-fit: contain; cursor: zoom-in; transition: transform 0.2s ease; }
     .cert-preview-card img.zoomed { max-height: 480px; cursor: zoom-out; }
+  
+    /* Auth & Profile Styles */
+    .user-profile-bar { display: flex; align-items: center; justify-content: space-between; background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 12px 14px; margin-bottom: 16px; }
+    .user-profile-info { display: flex; align-items: center; gap: 12px; }
+    .user-avatar { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #10b981; object-fit: cover; background: #1f2937; }
+    .user-name-title { font-size: 15px; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 6px; }
+    .user-bio { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .auth-tab-btn { flex: 1; padding: 10px; font-weight: 700; font-size: 13px; background: transparent; border: none; color: #9ca3af; border-bottom: 2px solid transparent; cursor: pointer; }
+    .auth-tab-btn.active { color: #10b981; border-bottom: 2px solid #10b981; }
+
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div class="badge">MARATHON ARCHIVE</div><div id="cloud-status-badge" style="font-size:11px;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:6px;border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;gap:4px;">☁️ 클라우드 연동 완료</div></div>
-      <h1>마라톤 대회 완주 기록 매니저</h1>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="badge">MARATHON ARCHIVE</div>
+        <div id="cloud-status-badge" style="font-size:11px;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:6px;border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;gap:4px;">☁️ 클라우드 동기화 완료</div>
+      </div>
+
+      <!-- 러너 프로필 및 로그인 상태 바 -->
+      <div id="auth-bar" class="user-profile-bar">
+        <div class="user-profile-info" id="user-profile-display" style="display:none;">
+          <img id="user-avatar-img" class="user-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=runner" alt="프로필">
+          <div>
+            <div class="user-name-title">
+              <span id="user-nickname-text">러너</span>
+              <button class="icon-btn" onclick="openProfileModal()" title="프로필 수정" style="padding:3px;background:none;border:none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+              </button>
+            </div>
+            <div id="user-bio-text" class="user-bio">서브4를 향해 달리는 중 🏃‍♂️</div>
+          </div>
+        </div>
+        <div id="guest-display" style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:12px;color:#9ca3af;">로그인하고 내 프로필과 기록을 관리하세요</div>
+        </div>
+        <div>
+          <button id="auth-main-btn" class="btn btn-secondary" onclick="handleAuthBtnClick()" style="padding:7px 12px;font-size:12px;border-radius:8px;">로그인 / 가입</button>
+        </div>
+      </div>
+
+      <h1 id="app-heading-title">나의 마라톤 완주 기록 아카이브</h1>
       <div class="btn-group" style="margin-top:14px;">
         <button class="btn btn-primary" onclick="openChoiceModal()" style="padding:14px 16px;font-size:14px;box-shadow:0 4px 14px rgba(16,185,129,0.25);flex:1.2;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v16m8-8H4"/></svg>
@@ -310,6 +346,70 @@
     </div>
   </div>
 
+  
+  <!-- 로그인 / 회원가입 모달 -->
+  <div id="auth-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeAuthModal()">
+    <div class="modal-box" style="max-width:380px;padding:24px 20px;">
+      <div class="modal-header" style="margin-bottom:12px;">
+        <div class="modal-title" id="auth-modal-title">러너 계정 로그인</div>
+        <button class="close-btn" onclick="closeAuthModal()">✕</button>
+      </div>
+      
+      <div style="display:flex;margin-bottom:18px;border-bottom:1px solid #1f2937;">
+        <button type="button" id="tab-login-btn" class="auth-tab-btn active" onclick="switchAuthTab('login')">로그인</button>
+        <button type="button" id="tab-signup-btn" class="auth-tab-btn" onclick="switchAuthTab('signup')">회원가입</button>
+      </div>
+
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group">
+          <label class="form-label">이메일 주소</label>
+          <input type="email" id="auth-email" required placeholder="runner@example.com" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">비밀번호</label>
+          <input type="password" id="auth-password" required minlength="6" placeholder="6자리 이상 입력" class="form-input">
+        </div>
+        <div class="form-group" id="signup-nickname-group" style="display:none;">
+          <label class="form-label">러너 닉네임</label>
+          <input type="text" id="auth-nickname" placeholder="예: 은채아빠, 서브4도전자" class="form-input">
+        </div>
+        <button type="submit" id="auth-submit-btn" class="btn btn-primary" style="width:100%;padding:13px;font-size:14px;margin-top:14px;">
+          로그인
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 프로필 수정 모달 -->
+  <div id="profile-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeProfileModal()">
+    <div class="modal-box" style="max-width:400px;padding:24px 20px;">
+      <div class="modal-header">
+        <div class="modal-title">러너 프로필 수정</div>
+        <button class="close-btn" onclick="closeProfileModal()">✕</button>
+      </div>
+      <form onsubmit="handleProfileUpdate(event)">
+        <div style="text-align:center;margin-bottom:16px;">
+          <img id="edit-avatar-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=runner" style="width:72px;height:72px;border-radius:50%;border:2px solid #10b981;object-fit:cover;background:#1f2937;margin-bottom:8px;">
+          <div>
+            <button type="button" class="btn btn-secondary" onclick="generateNewRandomAvatar()" style="font-size:11px;padding:5px 10px;margin:0 auto;">🎲 랜덤 아바타 변경</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">닉네임 *</label>
+          <input type="text" id="profile-name-input" required class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">한 줄 소개 / 러닝 목표</label>
+          <input type="text" id="profile-bio-input" placeholder="예: 2027 춘천마라톤 SUB-4 목표!" class="form-input">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">취소</button>
+          <button type="submit" class="btn btn-primary">프로필 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 기록증 원본 보기 모달 -->
   <div id="cert-viewer-modal" class="modal-overlay" style="display:none;">
     <div class="modal-box" style="text-align:center;">
@@ -423,6 +523,236 @@
     let activeCategory = "Full";
 
     // App Initialization: Fetch from Supabase Cloud DB with Local Fallback
+    
+    // User & Profile State
+    let currentUser = null;
+    let currentProfile = null;
+    let authMode = "login"; // "login" or "signup"
+    let tempAvatarUrl = "";
+
+    async function initAuthListener() {
+      if (!supabaseClient) return;
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+          currentUser = session.user;
+          await loadUserProfile(currentUser.id);
+        } else {
+          currentUser = null;
+          currentProfile = null;
+          updateAuthUI();
+        }
+
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+          if (session && session.user) {
+            currentUser = session.user;
+            await loadUserProfile(currentUser.id);
+            await initAuthListener();
+      await syncFromCloud();
+          } else {
+            currentUser = null;
+            currentProfile = null;
+            updateAuthUI();
+            await syncFromCloud();
+          }
+        });
+      } catch (err) {
+        console.warn("Auth initialization error:", err);
+      }
+    }
+
+    async function loadUserProfile(userId) {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (!error && data) {
+          currentProfile = data;
+        } else {
+          // If no profile yet, create a default one
+          const defNickname = currentUser.email ? currentUser.email.split('@')[0] : "러너";
+          const defAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`;
+          const { data: inserted } = await supabaseClient
+            .from('profiles')
+            .upsert({ id: userId, email: currentUser.email, nickname: defNickname, avatar_url: defAvatar, bio: "마라톤 완주를 향해! 🏃‍♂️" })
+            .select()
+            .single();
+          currentProfile = inserted || { id: userId, nickname: defNickname, avatar_url: defAvatar, bio: "마라톤 완주를 향해! 🏃‍♂️" };
+        }
+      } catch (err) {
+        console.error("Profile load exception:", err);
+      }
+      updateAuthUI();
+    }
+
+    function updateAuthUI() {
+      const profileDisplay = document.getElementById("user-profile-display");
+      const guestDisplay = document.getElementById("guest-display");
+      const authMainBtn = document.getElementById("auth-main-btn");
+      const appHeading = document.getElementById("app-heading-title");
+
+      if (currentUser && currentProfile) {
+        profileDisplay.style.display = "flex";
+        guestDisplay.style.display = "none";
+        document.getElementById("user-nickname-text").textContent = currentProfile.nickname || "러너";
+        document.getElementById("user-bio-text").textContent = currentProfile.bio || "달리는 중 🏃‍♂️";
+        document.getElementById("user-avatar-img").src = currentProfile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.id}`;
+        authMainBtn.textContent = "로그아웃";
+        authMainBtn.className = "btn btn-secondary";
+        if (appHeading) appHeading.textContent = `${currentProfile.nickname} 러너의 마라톤 아카이브`;
+      } else {
+        profileDisplay.style.display = "none";
+        guestDisplay.style.display = "flex";
+        authMainBtn.textContent = "로그인 / 가입";
+        authMainBtn.className = "btn btn-primary";
+        if (appHeading) appHeading.textContent = "나의 마라톤 완주 기록 아카이브";
+      }
+    }
+
+    function handleAuthBtnClick() {
+      if (currentUser) {
+        if (confirm("로그아웃 하시겠습니까?")) {
+          supabaseClient.auth.signOut();
+        }
+      } else {
+        openAuthModal('login');
+      }
+    }
+
+    function openAuthModal(mode = 'login') {
+      switchAuthTab(mode);
+      document.getElementById("auth-modal").style.display = "flex";
+    }
+
+    function closeAuthModal() {
+      document.getElementById("auth-modal").style.display = "none";
+    }
+
+    function switchAuthTab(mode) {
+      authMode = mode;
+      const loginTab = document.getElementById("tab-login-btn");
+      const signupTab = document.getElementById("tab-signup-btn");
+      const title = document.getElementById("auth-modal-title");
+      const submitBtn = document.getElementById("auth-submit-btn");
+      const nicknameGroup = document.getElementById("signup-nickname-group");
+
+      if (mode === 'login') {
+        loginTab.classList.add("active");
+        signupTab.classList.remove("active");
+        title.textContent = "러너 계정 로그인";
+        submitBtn.textContent = "로그인";
+        nicknameGroup.style.display = "none";
+      } else {
+        signupTab.classList.add("active");
+        loginTab.classList.remove("active");
+        title.textContent = "새 러너 계정 회원가입";
+        submitBtn.textContent = "회원가입 완료";
+        nicknameGroup.style.display = "block";
+      }
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      if (!supabaseClient) {
+        alert("Supabase 클라우드 설정이 완료되지 않았습니다.");
+        return;
+      }
+
+      const email = document.getElementById("auth-email").value.trim();
+      const password = document.getElementById("auth-password").value;
+      const nickname = document.getElementById("auth-nickname").value.trim() || email.split('@')[0];
+
+      const submitBtn = document.getElementById("auth-submit-btn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "처리 중...";
+
+      try {
+        if (authMode === 'login') {
+          const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          closeAuthModal();
+        } else {
+          // Sign Up
+          const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: { data: { nickname: nickname } }
+          });
+          if (error) throw error;
+
+          // Check if session created immediately (when email confirmation is off)
+          if (data.user) {
+            // Update profile with user-chosen nickname
+            await supabaseClient.from('profiles').upsert({
+              id: data.user.id,
+              email: email,
+              nickname: nickname,
+              avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${data.user.id}`,
+              bio: "마라톤 완주를 향해! 🏃‍♂️"
+            });
+            alert("회원가입이 성공적으로 완료되었습니다!");
+          }
+          closeAuthModal();
+        }
+      } catch (err) {
+        alert("인증 오류: " + (err.message || JSON.stringify(err)));
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = authMode === 'login' ? "로그인" : "회원가입 완료";
+      }
+    }
+
+    function openProfileModal() {
+      if (!currentProfile) return;
+      tempAvatarUrl = currentProfile.avatar_url;
+      document.getElementById("edit-avatar-preview").src = tempAvatarUrl;
+      document.getElementById("profile-name-input").value = currentProfile.nickname || "";
+      document.getElementById("profile-bio-input").value = currentProfile.bio || "";
+      document.getElementById("profile-modal").style.display = "flex";
+    }
+
+    function closeProfileModal() {
+      document.getElementById("profile-modal").style.display = "none";
+    }
+
+    function generateNewRandomAvatar() {
+      tempAvatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${Date.now()}`;
+      document.getElementById("edit-avatar-preview").src = tempAvatarUrl;
+    }
+
+    async function handleProfileUpdate(e) {
+      e.preventDefault();
+      if (!currentUser || !supabaseClient) return;
+
+      const newNick = document.getElementById("profile-name-input").value.trim();
+      const newBio = document.getElementById("profile-bio-input").value.trim();
+
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .update({
+          nickname: newNick,
+          bio: newBio,
+          avatar_url: tempAvatarUrl
+        })
+        .eq('id', currentUser.id)
+        .select()
+        .single();
+
+      if (error) {
+        alert("프로필 수정 오류: " + error.message);
+        return;
+      }
+
+      currentProfile = data;
+      updateAuthUI();
+      closeProfileModal();
+      alert("프로필이 업데이트되었습니다.");
+    }
+
     window.addEventListener("DOMContentLoaded", async () => {
       await initIndexedDB();
       await syncFromCloud();
@@ -434,10 +764,11 @@
 
       if (supabaseClient) {
         try {
-          const { data, error } = await supabaseClient
-            .from('marathon_records')
-            .select('*')
-            .order('date', { ascending: false });
+          let query = supabaseClient.from('marathon_records').select('*');
+          if (currentUser) {
+            query = query.or(`user_id.eq.${currentUser.id},user_id.is.null`);
+          }
+          const { data, error } = await query.order('date', { ascending: false });
 
           if (!error && data && data.length > 0) {
             records = data.map(row => ({
@@ -744,6 +1075,7 @@
         try {
           const dbRow = {
             id: recData.id,
+            user_id: currentUser ? currentUser.id : null,
             name: recData.name,
             category: recData.category,
             distance_km: recData.distanceKm,
