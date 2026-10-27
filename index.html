@@ -1162,22 +1162,32 @@
 
     window.addEventListener("DOMContentLoaded", async () => {
       await initIndexedDB();
+      await initAuthListener();
       await syncFromCloud();
     });
 
     async function syncFromCloud() {
       const statusBadge = document.getElementById("cloud-status-badge");
-      if (statusBadge) statusBadge.textContent = "☁️ 동기화 중...";
+
+      if (!currentUser) {
+        // 비로그인 상태일 때는 개인 기록실을 비우고 게스트 모드로 동작
+        records = [];
+        if (statusBadge) statusBadge.innerHTML = "☁️ 비로그인 (게스트)";
+        sortAndRenderApp();
+        return;
+      }
+
+      if (statusBadge) statusBadge.textContent = "☁️ 내 기록 동기화 중...";
 
       if (supabaseClient) {
         try {
-          let query = supabaseClient.from('marathon_records').select('*');
-          if (currentUser) {
-            query = query.or(`user_id.eq.${currentUser.id},user_id.is.null`);
-          }
-          const { data, error } = await query.order('date', { ascending: false });
+          const { data, error } = await supabaseClient
+            .from('marathon_records')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('date', { ascending: false });
 
-          if (!error && data && data.length > 0) {
+          if (!error && data) {
             records = data.map(row => ({
               id: row.id,
               name: row.name,
@@ -1194,21 +1204,16 @@
               certImageUrl: row.cert_image_url || null,
               hasCert: Boolean(row.cert_image_url)
             }));
-            localStorage.setItem("marathon_records_cloud_cache", JSON.stringify(records));
             if (statusBadge) statusBadge.innerHTML = "☁️ 클라우드 동기화 완료";
             sortAndRenderApp();
             return;
           }
         } catch (err) {
-          console.warn("Supabase fetch error, fallback to local:", err);
+          console.warn("Supabase fetch error:", err);
         }
       }
 
-      // Fallback to local storage
-      const cached = localStorage.getItem("marathon_records_cloud_cache") || localStorage.getItem("marathon_records_app_v9");
-      if (cached) {
-        records = JSON.parse(cached);
-      }
+      records = [];
       if (statusBadge) statusBadge.innerHTML = "☁️ 클라우드 연결됨";
       sortAndRenderApp();
     }
@@ -1272,8 +1277,18 @@
     function renderRecordsList() {
       const listEl = document.getElementById("records-list");
       document.getElementById("rec-total-count").textContent = `${records.length}개`;
+      if (!currentUser) {
+        listEl.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;background:#111827;border-radius:18px;border:1px dashed #374151;">
+            <div style="font-size:15px;font-weight:800;color:#ffffff;margin-bottom:6px;">로그인이 필요합니다</div>
+            <div style="font-size:12px;color:#9ca3af;margin-bottom:14px;">로그인하시면 등록하신 완주 기록과 PB 대시보드가 안전하게 보관됩니다.</div>
+            <button class="btn btn-primary" onclick="openAuthModal('login')" style="margin:0 auto;display:inline-flex;">러너 로그인하기</button>
+          </div>`;
+        return;
+      }
+
       if (records.length === 0) {
-        listEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">등록된 대회가 없습니다.</div>`;
+        listEl.innerHTML = `<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">등록된 완주 대회가 없습니다. [+ 기록 추가하기]를 눌러 첫 완주 기록을 남겨보세요!</div>`;
         return;
       }
 
@@ -1333,6 +1348,11 @@
 
     // Choice Modal Handlers
     function openChoiceModal() {
+      if (!currentUser) {
+        alert("기록을 등록하려면 먼저 로그인해주세요!");
+        openAuthModal('login');
+        return;
+      }
       document.getElementById("choice-modal").style.display = "flex";
     }
 
@@ -1350,6 +1370,11 @@
     }
 
     function openCreateModal() {
+      if (!currentUser) {
+        alert("기록을 등록하려면 먼저 로그인해주세요!");
+        openAuthModal('login');
+        return;
+      }
       currentEditingId = null;
       tempCertDataUrl = null;
       document.getElementById("modal-title").textContent = "새 대회 기록 등록";
@@ -1421,6 +1446,11 @@
 
     async function handleFormSubmit(e) {
       e.preventDefault();
+      if (!currentUser) {
+        alert("기록을 저장하려면 먼저 로그인해주세요!");
+        openAuthModal('login');
+        return;
+      }
       const dist = parseFloat(document.getElementById("form-dist").value);
       const h = parseInt(document.getElementById("form-h").value) || 0;
       const m = parseInt(document.getElementById("form-m").value) || 0;
@@ -1540,6 +1570,11 @@
     }
 
     function triggerOcrUpload() {
+      if (!currentUser) {
+        alert("기록을 등록하려면 먼저 로그인해주세요!");
+        openAuthModal('login');
+        return;
+      }
       document.getElementById("hiddenOcrInput").click();
     }
 
