@@ -621,8 +621,7 @@
           if (session && session.user) {
             currentUser = session.user;
             await loadUserProfile(currentUser.id);
-            await initAuthListener();
-      await syncFromCloud();
+            await syncFromCloud();
           } else {
             currentUser = null;
             currentProfile = null;
