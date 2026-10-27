@@ -18,7 +18,7 @@
     h1 { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
     
     .btn-group { display: flex; gap: 8px; margin-top: 14px; }
-    .btn { flex: 1; padding: 12px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.15s; }
+    .btn { flex: 1; padding: 12px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.15s; white-space: nowrap; flex-shrink: 0; }
     .btn-primary { background: #10b981; color: #022c22; }
     .btn-primary:active { background: #059669; }
     .btn-secondary { background: #1f2937; color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
@@ -89,11 +89,12 @@
     .cert-preview-card img.zoomed { max-height: 480px; cursor: zoom-out; }
   
     /* Auth & Profile Styles */
-    .user-profile-bar { display: flex; align-items: center; justify-content: space-between; background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 12px 14px; margin-bottom: 16px; }
-    .user-profile-info { display: flex; align-items: center; gap: 12px; }
-    .user-avatar { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #10b981; object-fit: cover; background: #1f2937; }
+    .user-profile-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 12px 14px; margin-bottom: 16px; }
+    .user-profile-info { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+    .user-avatar { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #10b981; object-fit: cover; background: #1f2937; flex-shrink: 0; }
     .user-name-title { font-size: 15px; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 6px; }
-    .user-bio { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    .user-bio { font-size: 11px; color: #9ca3af; margin-top: 2px; word-break: keep-all; line-height: 1.35; }
+    .auth-btn-wrap { flex-shrink: 0; }
     .auth-tab-btn { flex: 1; padding: 10px; font-weight: 700; font-size: 13px; background: transparent; border: none; color: #9ca3af; border-bottom: 2px solid transparent; cursor: pointer; }
     .auth-tab-btn.active { color: #10b981; border-bottom: 2px solid #10b981; }
 
@@ -290,7 +291,7 @@
 
     /* Runner Explore List */
     .runner-item { display: flex; align-items: center; justify-content: space-between; background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 12px; margin-bottom: 8px; }
-    .btn-follow { padding: 6px 14px; border-radius: 18px; font-size: 11px; font-weight: 800; border: none; cursor: pointer; }
+    .btn-follow { padding: 6px 14px; border-radius: 18px; font-size: 11px; font-weight: 800; border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
     .btn-follow.follow { background: #10b981; color: #022c22; }
     .btn-follow.following { background: #1f2937; color: #94a3b8; border: 1px solid #374151; }
 
@@ -321,8 +322,8 @@
         <div id="guest-display" style="display:flex;align-items:center;gap:8px;">
           <div style="font-size:12px;color:#9ca3af;">로그인하고 내 프로필과 기록을 관리하세요</div>
         </div>
-        <div>
-          <button id="auth-main-btn" class="btn btn-secondary" onclick="handleAuthBtnClick()" style="padding:7px 12px;font-size:12px;border-radius:8px;">로그인 / 가입</button>
+        <div class="auth-btn-wrap">
+          <button id="auth-main-btn" class="btn btn-secondary" onclick="handleAuthBtnClick()" style="padding:8px 14px;font-size:12px;border-radius:8px;white-space:nowrap;flex:none;">로그인 / 가입</button>
         </div>
       </div>
 
@@ -1173,11 +1174,8 @@
         const isSelf = currentUser && r.user_id === currentUser.id;
         const isClapped = clappedRecordIds.has(r.id);
         
-        // Base clap count computation
-        let hash = 0;
-        for (let i = 0; i < r.id.length; i++) hash = (hash * 31 + r.id.charCodeAt(i)) & 0xffffffff;
-        const baseClap = Math.abs(hash % 9) + 3;
-        const totalClap = baseClap + (isClapped ? 1 : 0);
+        // 실제 박수 누적 갯수 (기본 0개부터 시작)
+        const totalClap = isClapped ? 1 : 0;
 
         const tStr = `${String(r.hours).padStart(2,'0')}:${String(r.minutes).padStart(2,'0')}:${String(r.seconds).padStart(2,'0')}`;
         const tagClass = r.category === 'Full' ? 'tag-full' : (r.category === 'Half' ? 'tag-half' : 'tag-10k');
@@ -1194,7 +1192,7 @@
                   <div class="feed-date-line">${r.date || ''} • ${author.bio || '러너'}</div>
                 </div>
               </div>
-              <div>
+              <div style="flex-shrink:0;">
                 ${(!isSelf && r.user_id) ? `
                   <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow('${r.user_id}', this)">
                     ${isFollowed ? '팔로잉 ✓' : '+ 팔로우'}
@@ -1240,7 +1238,7 @@
 
             <!-- 하단 인터랙션 바: 간결해진 박수 버튼(아이콘 + 숫자) -->
             <div class="feed-interact-bar">
-              <button class="clap-btn-mini ${isClapped ? 'clapped' : ''}" onclick="toggleClap('${r.id}', this, ${baseClap})" title="완주 축하하기">
+              <button class="clap-btn-mini ${isClapped ? 'clapped' : ''}" onclick="toggleClap('${r.id}', this)" title="완주 축하하기">
                 👏 <span class="clap-count" id="clap-count-${r.id}">${totalClap}</span>
               </button>
               <div style="font-size:11px;color:#64748b;">
@@ -1252,7 +1250,7 @@
       }).join('');
     }
 
-    function toggleClap(recId, btn, baseClap) {
+    function toggleClap(recId, btn) {
       const isClapped = clappedRecordIds.has(recId);
       if (isClapped) {
         clappedRecordIds.delete(recId);
@@ -1265,7 +1263,7 @@
       btn.classList.toggle("clapped", newClapped);
       const cntEl = document.getElementById(`clap-count-${recId}`);
       if (cntEl) {
-        cntEl.textContent = baseClap + (newClapped ? 1 : 0);
+        cntEl.textContent = newClapped ? 1 : 0;
       }
     }
 
@@ -1332,22 +1330,22 @@
 
         return `
           <div class="runner-item">
-            <div style="display:flex;align-items:center;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
               <img class="feed-avatar" src="${r.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + r.id}" alt="아바타">
-              <div>
+              <div style="min-width:0;flex:1;">
                 <div style="font-size:14px;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:6px;">
                   ${r.nickname || '러너'}
                   ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : ''}
                 </div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${r.bio || '달리기를 사랑하는 러너'}</div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px;word-break:keep-all;line-height:1.3;">${r.bio || '달리기를 사랑하는 러너'}</div>
               </div>
             </div>
-            <div>
+            <div style="flex-shrink:0;">
               ${!isSelf ? `
                 <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow('${r.id}', this)">
                   ${isFollowed ? '팔로잉 ✓' : '+ 팔로우'}
                 </button>
-              ` : '<span style="font-size:11px;color:#64748b;padding:0 8px;">본인</span>'}
+              ` : '<span style="font-size:11px;color:#64748b;padding:0 8px;white-space:nowrap;">본인</span>'}
             </div>
           </div>
         `;
