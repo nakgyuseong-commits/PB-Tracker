@@ -3,20 +3,475 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>마라톤 기록 관리 매니저</title>
+  <title>PBPB - Personal Best Pace Book</title>
   <!-- Tesseract OCR CDN -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <!-- Supabase Cloud CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Cropper.js for circular avatar cropping -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js"></script>
+  <!-- 기록증 파서 (OCR 텍스트 → 대회명/종목/기록/배번/날짜) -->
+  <script>
+/* ==========================================================================
+   PBPB 기록증 파서 (브라우저/Node 공용, 의존성 없음)
+   - 여러 OCR 패스의 텍스트를 받아 항목별 후보를 모으고 "투표 + 타당성 검사"로 결정한다.
+   - 특정 대회 이름에 기대지 않는 범용 규칙이 기본이고,
+     대회명만은 (1) 내장 대회 사전 (2) DB에 이미 등록된 대회명 (3) 범용 추출 순으로 고른다.
+   입력: passes = [{ id, kind: 'text' | 'digits', text }]
+   옵션: { today: 'YYYY-MM-DD', knownRaceNames: [string] }
+   출력: { name, category, distanceKm, hours, minutes, seconds, bib, date, confidence: {...}, debug }
+   ========================================================================== */
+(function (root) {
+  'use strict';
+
+  const DIST = { Full: 42.195, Half: 21.0975, '10K': 10.0, '5K': 5.0 };
+
+  // ---------- 공통 유틸 ----------
+  function normLine(s) {
+    return String(s || '')
+      .replace(/[：﹕∶]/g, ':')
+      .replace(/[，]/g, ',')
+      .replace(/[“”"']/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function linesOf(p) { return String(p.text || '').split('\n').map(normLine).filter(Boolean); }
+  function addVote(map, key, w, extra) {
+    if (key == null || key === '') return;
+    const cur = map.get(key) || { key, score: 0, hits: 0, extra: extra || null };
+    cur.score += w; cur.hits += 1;
+    if (extra && !cur.extra) cur.extra = extra;
+    map.set(key, cur);
+  }
+  function ranked(map) { return [...map.values()].sort((a, b) => b.score - a.score || b.hits - a.hits); }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  // ---------- 1. 완주 기록 ----------
+  const RECORD_LABEL = /(기\s*록|Record|RECORD|Net|NET|Finish|FINISH|Time|TIME|완주\s*시간)/;
+  function timeCandidates(passes) {
+    const votes = new Map();
+    for (const p of passes) {
+      const lines = linesOf(p);
+      lines.forEach((line, i) => {
+        const labeled = RECORD_LABEL.test(line) || (i > 0 && RECORD_LABEL.test(lines[i - 1]) && !/\d/.test(lines[i - 1]));
+        // 00:58:51 / 01:59:32.58 / 0:50:51 / 701:58:38(앞 숫자 오인식) — 날짜(2026.10.18)는 제외
+        const re = /(\d{1,2})\s?([:;.])\s?(\d{2})\s?([:;.])\s?(\d{2})(?:[.,]\d{1,3})?(?!\d)/g;
+        let m;
+        while ((m = re.exec(line))) {
+          const prev = line[m.index - 1];
+          const colon = m[2] === ':' || m[4] === ':';
+          if (!colon || (prev && /\d/.test(prev) && (m[2] !== ':' || m[4] !== ':'))) { re.lastIndex = m.index + 1; continue; }
+          const h = +m[1], mi = +m[3], s = +m[5];
+          if (h > 9 || mi > 59 || s > 59 || h * 3600 + mi * 60 + s < 600) { re.lastIndex = m.index + 1; continue; }
+          const sec = h * 3600 + mi * 60 + s;
+          addVote(votes, `${pad2(h)}:${pad2(mi)}:${pad2(s)}`, 1 + (labeled ? 1 : 0), { h, mi, s, sec });
+        }
+        // 2시간 24분 21초
+        const k = line.match(/(\d{1,2})\s*시간\s*(\d{1,2})\s*분\s*(\d{1,2})\s*초/);
+        if (k) {
+          const h = +k[1], mi = +k[2], s = +k[3];
+          if (mi < 60 && s < 60) addVote(votes, `${pad2(h)}:${pad2(mi)}:${pad2(s)}`, 2, { h, mi, s, sec: h * 3600 + mi * 60 + s });
+        }
+      });
+    }
+    return ranked(votes);
+  }
+  // 페이스가 사람이 달릴 수 있는 범위(2'45" ~ 15'00"/km)인지
+  function plausible(sec, cat) {
+    const d = DIST[cat]; if (!d) return true;
+    const pace = sec / d; return pace >= 165 && pace <= 900;
+  }
+
+  // ---------- 2. 종목 ----------
+  const COURSE_LABEL = /(종\s*목|Course|COURSE|course|DIVISION|Division|부\s*문|코\s*스|EVENT|Event)/;
+  function catFromToken(raw) {
+    // OCR 흔한 오인식 보정: O→0, T0→10, 1 OK→10K
+    let t = String(raw).toUpperCase().replace(/\s+/g, '').replace(/(?<=\d)O|O(?=K)/g, '0').replace(/^T0/, '10').replace(/^I0|^L0/, '10');
+    if (/42(\.195)?K|^FULL|풀코스|^풀$|MARATHONFULL/.test(t)) return 'Full';
+    if (/HALF|하프|^아프|21(\.0975|\.1)?K/.test(t)) return 'Half';
+    if (/^10K|^10KM|^10\.0K/.test(t)) return '10K';
+    if (/^5K|^5KM/.test(t)) return '5K';
+    return null;
+  }
+  function categoryCandidates(passes) {
+    const votes = new Map();
+    for (const p of passes) {
+      if (p.kind !== 'text') continue;
+      const lines = linesOf(p);
+      lines.forEach((line, i) => {
+        if (COURSE_LABEL.test(line)) {
+          const after = line.split(COURSE_LABEL).pop();
+          const tryVals = [after, lines[i + 1] || '', lines[i + 2] || ''];
+          for (let j = 0; j < tryVals.length; j++) {
+            const toks = tryVals[j].replace(/[|_=\-:]/g, ' ').trim().split(' ');
+            let found = null;
+            for (let a = 0; a < toks.length && !found; a++) {
+              found = catFromToken(toks[a]) || catFromToken(toks[a] + (toks[a + 1] || '')) || catFromToken(toks.slice(a, a + 3).join(''));
+            }
+            if (found) { addVote(votes, found, 3); break; }
+          }
+        }
+        // 라벨 없는 키워드 (Half FINISHER / Full 모바일 기록증 / 10K CIRCUIT RUN / HALF)
+        if (/\bHalf\b|\bHALF\b|하프/.test(line)) addVote(votes, 'Half', 1);
+        if (/\bFull\b|\bFULL\b|풀코스/.test(line)) addVote(votes, 'Full', 1);
+        if (/\b10\s?K(M)?\b|\b10\s?km\b/i.test(line)) addVote(votes, '10K', 1);
+        if (/\b5\s?K(M)?\b|\b5\s?km\b/i.test(line)) addVote(votes, '5K', 0.5);
+      });
+    }
+    return ranked(votes);
+  }
+
+  // ---------- 3. 배번 ----------
+  const BIB_LABEL = /(배\s*번\s*호?|번\s*호|참가\s*번호|Number|NUMBER|number|\bBIB\b|\bBib\b|\bNo\.)/;
+  function bibCandidates(passes, ctx) {
+    const votes = new Map();
+    const bad = (n) => n === '42195' || n === '21097' || n === '21098' || n === '10000' || /^0+$/.test(n);
+    const isYearish = (n) => /^20[0-3]\d$/.test(n);
+    for (const p of passes) {
+      const lines = linesOf(p);
+      lines.forEach((line, i) => {
+        if (/[년월일]|January|February|March|April|May|June|July|August|September|October|November|December/.test(line)) return;
+        const lineNoTime = line.replace(/\d{1,2}\s?:\s?\d{2}\s?[:.]\s?\d{2}(?:[.,]\d+)?/g, ' ');
+        if (p.kind === 'text' && BIB_LABEL.test(line)) {
+          // 라벨 뒤쪽만 보고, 괄호 속 오인식((Bib)→(816))은 버린다
+          const after = line.split(BIB_LABEL).pop().replace(/\([^)]*\)/g, ' ');
+          // 라벨 뒤 숫자 묶음 중 가장 긴 것(같으면 뒤쪽) — 라벨 글자가 숫자로 오인식된 '005' 같은 앞쪽 잡음을 피한다
+          const groups = [];
+          for (const run of (after.match(/\d+(?: \d+)*/g) || [])) {
+            const parts = run.split(' ');
+            for (let a = 0; a < parts.length; a++) for (let b = a; b < parts.length; b++) groups.push(parts.slice(a, b + 1).join(''));
+          }
+          const okGroups = groups.filter(g => g.length >= 3 && g.length <= 6);
+          let val = okGroups.reduce((best, g) => (!best || g.length >= best.length ? g : best), '');
+          if (!(val.length >= 3 && val.length <= 6)) {
+            // 표 머리글형(DIVISION | BIB) → 다음 줄 마지막 숫자
+            const nxt = (lines[i + 1] || '').match(/\d{3,6}/g);
+            val = nxt ? nxt[nxt.length - 1] : '';
+          }
+          // 3자리이거나 0으로 시작하면 라벨이 있어도 확신을 낮춘다
+          if (val.length >= 3 && val.length <= 6 && !bad(val)) addVote(votes, val, (val.length >= 4 && val[0] !== '0') ? 4 : 2);
+          return;
+        }
+        // 라벨 없는 독립 숫자(줄 전체가 숫자이거나 이름 뒤 숫자)
+        if (/대\s*회\s*명|Event\)/i.test(line)) return;             // 대회명 줄의 깨진 글자는 배번이 아님
+        const toks = lineNoTime.match(/(?<![\d.:(])\d{4,6}(?![\d.)])/g) || [];   // 괄호 속 숫자 제외
+        const standalone = /^[^\d]{0,4}\d{4,6}[^\d]{0,4}$/.test(lineNoTime.trim());
+        for (const t of toks) {
+          if (bad(t)) continue;
+          if (isYearish(t) && (t === ctx.year || /^20(2|1)\d$/.test(t))) continue;   // 연도로 보이는 숫자는 라벨 있을 때만
+          // '2026 안양천' → 20262 처럼 연도에 글자가 붙어 생긴 숫자는 약하게
+          const yearGlued = ctx.year && t.length >= 5 && (t.startsWith(ctx.year) || t.endsWith(ctx.year));
+          // 표의 '종목'·'기록' 줄 바로 옆에 있는 숫자는 배번 칸일 가능성이 높다 (라벨이 깨져 읽힌 경우)
+          const besideRow = p.kind === 'text' && [lines[i - 1], lines[i + 1]].some(l => l && (COURSE_LABEL.test(l) || RECORD_LABEL.test(l)));
+          addVote(votes, t, ((standalone ? 1 : 0.4) + (besideRow ? 1 : 0)) * (yearGlued ? 0.3 : 1));
+        }
+      });
+    }
+    return ranked(votes);
+  }
+
+  // ---------- 4. 날짜 ----------
+  const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  function validDate(y, m, d, today) {
+    if (!(y >= 2000 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (dt.getUTCMonth() !== m - 1) return null;
+    const s = `${y}-${pad2(m)}-${pad2(d)}`;
+    if (today && s > today) return null;
+    return s;
+  }
+  // OCR이 '월','일'을 숫자로 읽어 붙인 경우(102 → 10, 289 → 28) 보정
+  function trimUnit(tok, max) {
+    let t = tok.replace(/\D/g, '');
+    if (!t) return NaN;
+    if (t.length >= 3) t = t.slice(0, 2);
+    if (+t > max && t.length === 2) t = t.slice(0, 1);
+    return +t;
+  }
+  function dateCandidates(passes, today) {
+    const votes = new Map();
+    for (const p of passes) {
+      for (const line of linesOf(p)) {
+        let m;
+        // English: October 25, 2026 / November 22. 2025
+        const reEn = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?[,.]?\s+(20\d\d)/gi;
+        while ((m = reEn.exec(line))) { const v = validDate(+m[3], MONTHS[m[1].slice(0, 3).toLowerCase()], +m[2], today); if (v) addVote(votes, v, 3); }
+        // 2026. 10. 18. / 2025.9.28 / 2026-05-23 / 2026/05/23
+        const reDot = /(?<!\d)(20\d\d)\s?[.\-/]\s?(\d{1,2})\s?[.\-/]\s?(\d{1,2})(?!\d)/g;
+        while ((m = reDot.exec(line))) { const v = validDate(+m[1], +m[2], +m[3], today); if (v) addVote(votes, v, 3); }
+        // 2026년 10월 25일 (단위 글자가 2개 이상 살아있으면 확실)
+        const reKo = /(20\d\d)\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?/g;
+        while ((m = reKo.exec(line))) { const v = validDate(+m[1], +m[2], +m[3], today); if (v) addVote(votes, v, 3); }
+        // 깨진 한국어: 20264 10& 182 / 2025 10월 122 / 20254 112 9
+        if (!/:/.test(line)) {
+          const reLoose = /(?<!\d)(20[0-3]\d)[년4569]?\s+(\d{1,3})[월&8%]?\s+(\d{1,3})(?:[일2]|\b)/g;
+          while ((m = reLoose.exec(line))) {
+            const v = validDate(+m[1], trimUnit(m[2], 12), trimUnit(m[3], 31), today);
+            if (v) addVote(votes, v, 1);
+          }
+          const reLoose2 = /(?<!\d)(20[0-3]\d)[년4569]?\s+(\d{1,2})\s*월\s*(\d{1,3})/g;
+          while ((m = reLoose2.exec(line))) {
+            const v = validDate(+m[1], +m[2], trimUnit(m[3], 31), today);
+            if (v) addVote(votes, v, 1.5);
+          }
+        }
+      }
+    }
+    return ranked(votes);
+  }
+
+  // ---------- 5. 대회명 ----------
+  // 내장 사전: 글꼴이 화려해서 OCR이 제목을 못 읽는 대회도 기록증의 다른 글자(주최, 문구)로 알아본다.
+  // {year}, {ed}(회차) 자리는 판독한 값으로 채운다. base: 회차를 못 읽었을 때 연도로 추정하는 기준.
+  const RACE_DICT = [
+    { name: '{year} 춘천마라톤', all: [/춘천\s*마라톤|CHUNCHEON/i] },
+    { name: '{year} 서울달리기 (SEOUL RACE)', any: [/서울\s*달리기|SEOUL\s*RACE/i, /SEOUL[\s\S]{0,80}RACE/i] },
+    { name: '{year} JTBC 서울마라톤', any: [/JTBC/i, /Jtb[ce]\b/], all: [/SEOUL|Seoul|서울/] },
+    { name: '{year} 서울마라톤 (동아마라톤)', all: [/서울\s*마라톤|동아\s*마라톤|SEOUL\s*MARATHON/i] },
+    { name: '{year} 경주국제마라톤', all: [/경주\s*국제\s*마라톤|GYEONGJU/i] },
+    { name: '{year} 대구마라톤', all: [/대구\s*마라톤|DAEGU\s*MARATHON/i] },
+    { name: '{year} 대구국제마라톤대회', all: [/대구\s*국제\s*마라톤|DAEGU\s*INTERNATIONAL/i] },
+    { name: '{year} 안양천 장미꽃 축제 마라톤', all: [/안양천/, /장미|축제|마라톤/] },
+    { name: '{year} 서산 코스모스 황금들녘 마라톤대회', all: [/서산/, /코스모스|황금|들[녘녁]/] },
+    { name: '제{ed}회 중랑구청장배 장미 마라톤대회', all: [/중랑/, /장미|마라톤/], base: [18, 2025] },
+    { name: '제{ed}회 세종특별자치시 전국 마라톤대회', all: [/세종\s*특별\s*자치시/, /마라톤/], base: [1, 2025] },
+    { name: 'EVERLAND 10K CIRCUIT RUN', all: [/EVERLAND|에버랜드/i] },
+    { name: '{year} 파주 북시티 아트 마라톤', all: [/PAJU|파주/i, /BOOK\s*CITY|ROOKCITY|북시티|출판\s*도시|줄판\s*도시/i] },
+    { name: '제{ed}회 울산 커플마라톤', any: [/ULSAN\s*COUPLE|울산\s*커플/i, /ULSAN[\s\S]{0,20}COUPLE/i], base: [23, 2025] },
+    { name: '{year} 경청 마라톤', all: [/경청\s*마라톤|GYEONG\s*CHEONG/i] },
+    { name: '제{ed}회 대청호 마라톤대회', any: [/대청호/, /대덕\s*구\s*체육회/, /사랑\s*담고/], base: [25, 2026] },
+    { name: '제{ed}회 가평자라섬 전국 마라톤대회', any: [/자라섬/, /가평\s*군?\s*체육회/, /GAPYEONG/i], base: [19, 2026] },
+    { name: '제{ed}회 홍성마라톤대회', any: [/홍성\s*마라톤/, /홍성\s*군\s*체육회/, /이봉주/, /HONG\s*SEONG/i], base: [26, 2026] },
+  ];
+  // 참고 대회 목록: 러너온(runneron.com) 예정·지난 대회 목록에서 이름만 정리 (2026-10 기준, 769개)
+  // 사전보다 우선순위가 낮고, 한글 이름이 기록증 글자와 충분히 겹칠 때만 채택한다.
+  const REF_RACES = ["{year} 오티즘 레이스", "{year} 마블런", "제{ed}회 성남YMCA 마라톤", "런텐 12차 레이스 JUST RUN10 포천", "제{ed}회 중소기업 인 기살리기 마라톤 대회", "제{ed}회 사천노을 마라톤대회", "{year} 태종대 BEAT ON 좀비레이스", "{year} 당진원런 마라톤", "{year} NAMHAE 250K : RUN TO VILLAGE", "서울국제마라톤", "{year} JTBC 마라톤 제마", "제{ed}회 울산인권마라톤", "{year} 무안 해안 노을길 걷기 및 마라톤", "{year} 김천전국마라톤대회", "제{ed}회 대전 신채호 마라톤", "{year} DMZ OPEN 평화마라톤", "{year} JUSTICE RUN SEOCHO", "{year} 서울동행마라톤대회", "제{ed}회 서봉기단축마라톤", "{year} 포항마라톤챔피언십", "{year} 영천댐 마라톤 대회", "제{ed}회 부여 굿뜨래 마라톤 대회", "{year} 해양수도 부산 런페스타", "{year} 넥슨과 함께하는 미라클365 푸르메런", "{year} Ten Bridges Night Walk", "{year} 평화의섬 국무총리기국제생활체육구간 마라톤", "제{ed}회 담양메타세쿼이아 마라톤", "{year} 굿네이버스 충청권역X계란자조금관리위원회 EGG RUN", "런텐 13차 레이스 JUST RUN10 대전", "{year} 여수 일레븐브리지마라톤", "{year} SaveRace", "{year} GVIE RUN 구미", "{year} 문경 레전드 트레일 백두대간", "제{ed}회 진해마라톤", "레디, 셋, 공익런!", "제{ed}회 회복마라톤", "제주국제트레일러닝", "{year} 양산 배내골 애플 런", "제{ed}회 송파구청장배 마라톤", "제{ed}회 거제시체육회장배 거제앵산트레일레이스", "{year} 서울구석구석 국제 트레일런", "{year} 과천마라톤", "{year} 부산 헤리티지 런", "경주시육상연맹회장배 마라톤대회", "제{ed}회 자원봉사 사랑 굿펀 마라톤", "{year} 라운드랩 RUN", "{year} 청양군 체육회장기 칠갑마라톤대회", "{year} 경상북도 신도시 마라톤", "{year} 경기화성 생태마라톤", "{year} 안성맞춤 전국 마라톤", "제{ed}회 전국 나주 금성산숲길마라톤", "{year} 해남땅끝 전국마라톤대회", "제{ed}회 아산 은행나무길 전국마라톤", "강남하프마라톤(제{ed}회 강남구청장배육상대회)", "{year} 전국사상에코마라톤", "제{ed}회 자유민주 마라톤대회", "제{ed}회 완주군 만경강 마라톤 대회", "{year} 올림픽데이런 in 서울", "제{ed}회 순천 남승룡마라톤대회", "{year} 강원 속초 해변길 건강달리기", "{year} 서울 빵빵런", "그 시절 스타들과 달리는 레트로 런 IN 증평", "{year} 통큰런", "{year} 영종 하늘길 마라톤", "제{ed}회 한강 브릿지 런", "제{ed}회 안양천 단풍길 마라톤", "{year} 스타콜 × 롤링스톤 레트로 런 IN 증평", "{year} GLOBAL 6K FOR WATER 마라톤 대구대회", "JTBC 서울마라톤", "제{ed}회 무등산더블하트국제트레일런", "제{ed}회 대모산 구룡산 트레일런", "제{ed}회 상주 곶감 마라톤대회", "제{ed}회 행복트레일런 축제", "{year} 가민런 코리아", "제{ed}회 세종특별자치시 전국 마라톤", "{year} MBN 서울마라톤", "제{ed}회 영남알프스 전국 하프마라톤", "제{ed}회 고창고인돌마라톤", "제{ed}회 부산국제신문마라톤", "{year} 9회 서울평화마라톤", "{year} 제주감귤마라톤", "제{ed}회 부산국제마라톤대회", "{year} 연수구청장배 송도 WALK & RUN", "{year} 에코나우런", "{year} 청춘레이스", "{year} FILA RUN & ESPRESSO", "{year} 손기정평화마라톤", "제{ed}회 창원특례시장배 광려천마라톤", "{year} 나눔레이스 인 용인", "{year} 영남일보 혁신도시 마라톤", "26회 창원통일마라톤", "우리함께런 with 빗썸나눔", "제{ed}회 대전서구청장배 마라톤대회", "{year} 세정 가을바람 유러닝페스타", "{year} 남해트레일레이스", "런텐 14차 레이스 JUST RUN10 대구", "{year} GETR구미 에코 트레일레이스", "{year} 서울 라이프마라톤", "{year} GIVE RUN 부산", "K-거상 트레일 러닝 대회", "{year} 아식스 서울신문 고프리런", "{year} 전마협 보성녹차 마라톤", "부산항일학생의거86주년기념 부산시민이어달리기", "{year} 인천마라톤", "{year} 자이스 스마일 레이스", "{year} 서울 억새풀 마라톤대회", "{year} 평화의숲 마라톤", "{year} 김대중마라톤대회", "{year} 무주반딧불평화마라톤", "제{ed}회 고용노동부장관배 직장인마라톤대회", "{year} 무진장트레일레이스", "{year} 목욕런", "{year} 남원 춘향 전국 마라톤대회", "{year} 서울 세계청년대회 성공 기원 평화런", "제{ed}회 천안독립기념관 마라톤대회", "{year} 서울사랑마라톤", "제{ed}회 광진구청장배 육상대회", "{year} 원주 치악마라톤", "가야왕도 김해 전국어울림 마라톤대회", "{year} 대전보문산트레일", "제{ed}회 안중근 평화 마라톤", "{year} 새한미디어 마라톤", "{year} 천안 희망나눔 마라톤", "{year} 정읍공동체 프리마켓 마라톤", "{year} 전국마라톤협회 금산 골드런 마라톤", "{year} 허그런(HUG RUN)", "제{ed}회 가든파이브 라이프 레이스", "제{ed}회 한강시민마라톤", "{year} 하남 미사 호수 에너지런", "{year} 월드 레코드 국제 마라톤 축제", "오크밸리 윈터 하프 마라톤", "부산바다마라톤", "{year} 부산브릿지 마라톤", "제{ed}회 정읍 고향사랑기부마라톤", "제{ed}회 양산전국하프마라톤", "{year} 황영조 로드레이스", "{year} 청춘런", "사바스티안 사웨 초청기념 월드레코드 마라톤축제", "{year} 연합뉴스 하남 국제 트레일런 페스티벌", "{year} 소년소녀 가장 돕기 기부런", "제{ed}회 긍정의힘 마라톤", "{year} ONE MORE RUN", "제{ed}회 밤섬 마라톤", "제{ed}회 일자산 트레일 러닝", "제{ed}회 진주마라톤", "{year} 슬로우런마라톤", "{year} 코리아 시즌 레이스", "희망드림 제{ed}회 동계마라톤대회", "{year} 전마협 청주 무심천 투데이 마라톤", "제{ed}회 밀양아리랑마라톤", "{year} 대구마라톤", "{year} 머니투데이방송 삼일절 마라톤", "동아일보 서울국제마라톤", "{year} 서울마라톤", "제{ed}회 영광광풍마라톤", "대구국제마라톤", "제{ed}회 오션뷰 기장바다마라톤", "소아암환우돕기 제{ed}회 서울시민마라톤", "{year} 청송사과 트레일런", "제{ed}회 청도반시 전국마라톤", "{year} 춘천마라톤", "{year} 광명평화마라톤", "K-RUN 챌린지", "{year} 울산런페스타 U-RUN", "제{ed}회 정서진아라뱃길 전국마라톤대회", "{year} GTWS 무주 트레일", "제{ed}회 감성런", "{year} 하남 어텀 패밀리 마라톤", "{year} 익산 기부런", "{year} 경기옛길 함께 RUN", "{year} 네이버웍스와 함께하는 SEJONG RUN", "RUN&MUSIC FESTIVAL in 안동", "{year} SEOUL PETLYMPIC & RUN WITH GO", "Freedom Walk & Run", "TOUR 5K & Beach Ploggin망상", "불닭 버닝 트레일런", "{year} 뉴시스 바다마라톤", "{year} 무쓰런", "{year} 담양 트레일런 데이브레이크", "서울 대모-구룡산트레일런", "{year} 한강런", "{year} 프리덤 워크 & 런", "{year} 아시아 오픈 마라톤", "{year} 그린스텝", "제{ed}회 대청호마라톤대회", "제{ed}회 여주 세종대왕 마라톤", "제{ed}회 대구 북구사랑 마라톤", "제{ed}회 중랑구청장배 마라톤", "제{ed}회 중랑구청장배 장미 마라톤", "{year} 하남시 시장기 당정마라톤", "제{ed}회 창원 시민건강달리기", "제{ed}회 청원생명쌀대청호마라톤", "{year} 경포마라톤", "{year} 경주국제마라톤", "{year} 정선동강 마라톤", "{year} 대전 Dtrail 레이스", "{year} 경청마라톤", "제{ed}회 충청남도 태안 전국어울림마라톤", "{year} 마인드런", "{year} U+ 119 메모리얼런", "{year} 전남광주통합특별시 남구청장배 마라톤", "제{ed}회 10.19 평화마라톤", "굿네이버스 레이스 with 띵크어스 광주 레이스", "{year} 원주 바람길숲 기부런", "{year} 억새노을마라톤대회", "{year} 의정부시 물길마라톤", "7080 띠별 온라인 마라톤 대회", "제{ed}회 가을철 산불조심마라톤", "{year} MBN 전국 나주 마라톤", "{year} 서울레이스 (Seoul Race)", "{year} 평택항마라톤", "{year} 문경 오미자 하프마라톤", "{year} 핑크런 기부 캠페인", "진안고원 포레스티벌 Run & Heal", "{year} 천안 이봉주 마라톤", "{year} 울산마라톤대회", "{year} Global 6k for Water 마라톤 구미대회", "{year} 대학생RUN", "제{ed}회 천안삼거리 흥타령 울트라마라톤", "제{ed}회 무등산지오마라톤", "제{ed}회 거제시장배 섬꽃 전국 마라톤", "제{ed}회 구미시장배 금오산트레일 레이스", "제{ed}회 성동구연맹회장기 마라톤", "제{ed}회 강서허준런", "충주 앙성 비내길 마라톤 대회", "제주풍차런", "제{ed}회 홍성마라톤", "{year} 한글런", "WYD와 함께하는 생명사랑 마라톤/걷기 대회", "{year} 서울오픈마라톤", "{year} 런센스", "제{ed}회 시흥시 전국하프마라톤", "{year} 한경서울마라톤", "제{ed}회 달서하프마라톤 대회", "{year} 안동마라톤", "{year} YTN 서울투어마라톤", "{year} 파주북시티마라톤", "{year} 홍천사랑마라톤", "제{ed}회 경남마라톤", "{year} S오일 감동의 마라톤", "제{ed}회 광명시장배건강달리기", "{year} Run Your Way Seoul 10K", "제{ed}회 아산이순신 트레일", "{year} 서산 코스모스 황금들녘 마라톤 대회", "제{ed}회 앵봉산 서울트레일러닝", "{year} 천사데이기념 동두천천사마라톤", "제{ed}회 김제새만금 지평선 전국마라톤", "{year} 글로벌 6K 포 워터 부산", "{year} 완주트레일런", "{year} 마스터즈 하프 마라톤", "{year} 하반기 JUST RUN10 청주", "{year} 춘천연합마라톤", "{year} SMTOWN RUN CLUB", "{year} ROK ARMY 트레일러닝 대회", "소노 런트립 180K in 경주", "제{ed}회 가평자라섬 전국마라톤", "{year} 공주백제 마라톤", "제{ed}회 선사마라톤 축제", "{year} 동대문마라톤", "{year} 공주마라톤", "{year} 한돈런", "제{ed}회 마포구청장배 마라톤 대회", "{year} 울산남구육상연맹 회장배 단축마라톤", "{year} 안산마라톤", "{year} 인천송도국제하프마라톤", "아라뱃길나이트워크 66Km", "{year} 금산인삼축제 마라톤", "{year} 장수트레일레이스 Fall", "제{ed}회 사이버 영토 수호 마라톤 대회", "{year} 안양천 하프 마라톤", "{year} JUST RUN10 김해 대동", "제{ed}회 문경 오미자런", "시포레 RUN & FIT with 디스커버리", "{year} 무한도전 Run in 경주", "{year} 여수낭도트레일", "{year} 울진 금강송배 전국마라톤", "제{ed}회 설악산 공룡능선 UTMB", "제{ed}회 스마일 런 페스티벌", "제{ed}회 강화해변마라톤대회", "{year} 포항이차전지전국마라톤", "{year} 런서울런", "달리는 세상 10km 런", "{year} 히어로레이스", "제{ed}회 구로구청장배 안양천 단풍마라톤", "{year} 빵트레일런", "{year} 양양 강변 전국 마라톤", "제{ed}회 초록우산 런웨이 마라톤", "제{ed}회 화이트런 생리대 기부마라톤", "{year} 에너지 히어로 레이스", "{year} 나이트런 플러스 청주", "{year} 장수 레드푸드레이스 트레일런", "{year} 굿네이버스 레이스", "{year} 여수 백리섬섬트레일런", "제{ed}회 청광종주 의왕대간 트레일", "{year} 봉화송이 전국마라톤", "{year} 샌드런 IN 영덕", "제{ed}회 김대중 평화 마라톤 대회", "제{ed}회 인천 서구청장배 단축마라톤", "{year} 전마협회장배 청주마라톤", "희망드림 제{ed}회 새벽강변 국제마라톤", "제{ed}회 철원DMZ국제평화마라톤", "제{ed}회 순천만울트라마라톤대회", "{year} 다이나핏 태백 트레일", "제{ed}회 Vrun", "제{ed}회 I LOVE 방송대 마라톤", "{year} 이일선마라톤", "사우나런 in 뚝섬한강공원", "제{ed}회 한강 서울 하프 마라톤", "제{ed}회 GO대관령 국제 트레일런", "{year} 대구세계마스터즈육상경기대회", "제{ed}회 성북구청장배육상대회", "{year} 단양달빛레이스", "{year} 전마협 증평 무료 마라톤", "{year} 손기정하천마라톤", "{year} 금수산트레일러닝대회", "제{ed}회 한양도성길 트레일런", "{year} Happy700평창대관령전국하프마라톤", "제{ed}회 지리산화대종주 UTMB", "영남알프스9봉 트레일 레이스", "{year} 815런 잘될 거야 대한민국 기부런", "{year} 안양천 달빛 나이트런", "{year} 장수 나이트 트레일", "{year} 전마협 광복절 무료 초청 마라톤", "{year} 인천 나이트 레이스", "제{ed}회 테마임도 트레일런", "{year} 양산 어필 레이스", "{year} 인사이더런 S", "{year} 나이트런 부산", "순천만국가정원 챌린지가든런", "제{ed}회 청계산 인릉산 일주 트레일", "제{ed}회 태종대전국마라톤", "{year} 쿨밸리트레일레이스", "사우나런 in 올림픽공원", "제{ed}회 울릉나이트런", "{year} 코리아 나이트 런 태백", "{year} 전마협 청주 무료 초청 훈련 마라톤", "{year} 울릉도 국제 트레일러닝", "{year} 광제산 트레일 런", "{year} 전마협 무주 풀코스 마라톤", "제{ed}회 인왕산 서울 트레일런", "제{ed}회 노원구청장배 겸 회장배마라톤", "{year} 아이언 런", "{year} 전마협 하계 무료 훈련 마라톤", "사우나런 in 석촌호수", "{year} 서울런", "{year} 블루베리 마라톤 축제", "제{ed}회 송도 이봉주 마라톤", "제{ed}회 강북구청장배 마라톤", "제{ed}회 리프레시런", "{year} 울산남구청장배 육상대회", "{year} THE PACER", "{year} 큰별 나눔 마라톤", "{year} 순천 치유 미식 트레일런", "{year} 전마협 10km 연대별 최강전", "{year} 무주 베리 로드 트레일", "{year} 큰별 하프 마라톤", "제{ed}회 소백산 국망봉 왕복 트레일", "{year} 람사르습지 밤섬런", "{year} 참행복나눔 마라톤", "{year} 보은 속리산 말티재 힐링 알몸 마라톤", "{year} 월리를 찾아라 런 in 서울", "{year} SPINDLE TRAIL RUN", "{year} 소백산 죽령트레일런", "제{ed}회 충주마라톤", "제{ed}회 국민행복마라톤", "제{ed}회 희망 서울 마라톤", "{year} 웰메이드런", "경주 남산트레일런", "{year} 글로벌 6K 포 워터 서울", "제{ed}회 영덕 해변 전국마라톤", "제{ed}회 울릉도전국마라톤", "{year} 대전월드런마라톤축제", "{year} 김해숲길마라톤", "제{ed}회 광진구연맹회장배 육상대회", "제{ed}회 인천광역시장기 건강달리기", "제{ed}회 포항철강마라톤 스틸런", "제{ed}회 설악국제트레킹페스티벌", "제{ed}회 빛고을 울트라마라톤", "제{ed}회 무등산무돌길완주대회", "제{ed}회 시각장애인과 함께하는 어울림 마라톤", "{year} 운탄고도 스카이레이스", "{year} 강릉옥계헌화로11K RUN", "{year} 성남마라톤", "제{ed}회 일광문오성 바다 마라톤", "{year} 컬처런", "{year} 런 지중해의 밤 마라톤", "제{ed}회 모두런", "DC SUPER HERO RUN", "{year} 지중해마을 마라톤", "{year} 천천히 마라톤 in 송파", "제{ed}회 제주관광마라톤 축제", "{year} iM뱅크 코리아 오픈 마라톤", "제{ed}회 너릿재마라톤", "{year} 마인드 마라톤", "{year} THE RACE DAEGU 10K", "{year} 명품-FAAB 한강 브릿지런", "NAMHAE 250K - RUN TO SEA", "{year} 백산수 심심런", "{year} 도시가스 트레일 온 런 강원", "{year} 춘천봄내마라톤", "{year} 푸른하늘런", "제{ed}회 남한산성 트레일", "{year} 한라산 100 트레일런", "제{ed}회 양평이봉주마라톤", "6.6 걷기대회 한국해비타트 캠페인", "{year} 물사랑 낙동강 200km 울트라마라톤", "{year} 금산월드런마라톤", "{year} 독도수호를 위한 동호인마라톤", "{year} 백양산숲길건강달리기", "{year} 더 레이스 광주 10K", "{year} 고래마라톤", "제{ed}회 여의도 밤섬 마라톤", "제{ed}회 영등포구연맹회장배 육상대회", "{year} 삼삼트레일런", "제{ed}회 거제100K", "제{ed}회 여명국제마라톤", "{year} 지구런 : 더 아시안 하이웨이", "{year} 제주 김녕 빵빵런", "제{ed}회 한밭 런앤워크", "{year} 강남 하프레이스", "{year} 야반도주 in Busan", "6·10만세운동 메모리얼로드", "제{ed}회 버티컬런 광주대학교 수직 마라톤 대회", "{year} 부천의장배 20km릴레이마라톤", "{year} 버닝런", "제{ed}회 바다의 날 마라톤", "{year} 안양천 장미 마라톤", "{year} 하루런 마라톤", "제{ed}회 회동호 트레일런", "{year} 분노의질주런 용인스피드웨이", "{year} 달려용, 인 RUN FESTA", "{year} 한화생명 시그니처 63 RUN", "{year} 세이브더칠드런 국제어린이마라톤(나주)", "{year} 식품안전 마라톤", "{year} 더 레이스 대전 10K", "{year} 인천시육상연맹배 마라톤", "{year} GOLD RUSH RACE", "{year} 옥스팜 트레일워커", "제{ed}회 서울한강 울트라마라톤", "제{ed}회 경기신문 씨사이드 마라톤", "{year} 서울신문 하프마라톤", "{year} 서천한산모시마라톤", "{year} 레고랜드 런", "오클리 커뮤니티 러닝 with 스타벅스", "시골'S런 양주 꿀런", "RUN 518 도청가는길", "{year} 철강마라톤", "{year} 연구단지 생물다양성 마라톤 '다다다런'", "제{ed}회 서울시민 마라톤", "{year} 무의도구석구석 국제트레일런", "{year} 가정의달 하하호호마라톤", "{year} 용인마라톤", "{year} 서울 유아차 레이스 with 신한 20+뛰어요", "제{ed}회 대전 3대하천 마라톤", "{year} 선양마사이 마라톤", "{year} 윙스 포 라이프 월드런", "{year} 동해 스카이레이스", "{year} 부산 50K", "제{ed}회 대전 한밭울트라마라톤", "제{ed}회 서울워킹페스티벌", "{year} 커피 빵빵런", "제{ed}회 보령머드임해마라톤", "{year} 솔로런", "제{ed}회 전기사랑마라톤", "{year} 포켓몬런", "제{ed}회 화성효마라톤", "제{ed}회 불.수.사.도.북 UTMB", "{year} 전국의병 마라톤", "{year} 더 레이스 대구", "{year} 굽네 오븐런 부산", "{year} 하트시그널 러닝 페스타", "{year} KB스타런 캠페인", "남한산성 트레일런", "제{ed}회 보성 녹차 마라톤", "{year} 구례 지리산봄길 마라톤", "제{ed}회 5.18마라톤", "제{ed}회 여성마라톤", "제{ed}회 남해다랑논마라톤", "{year} 대전 국제어린이마라톤", "제{ed}회 통일기원 포항해변마라톤", "{year} 서울하프마라톤", "속리산 문장대 트레일 러닝", "제{ed}회 홍천트레일런", "제{ed}회 반기문마라톤", "제{ed}회 광명육상연맹회장배 건강달리기", "{year} 패밀리 런 페스타", "제{ed}회 삼척 황영조 국제 마라톤", "제{ed}회 성지순례 울트라마라톤", "제{ed}회 단양팔경 걷기 및 마라톤", "{year} 부안해변마라톤", "제{ed}회 울산커플마라톤", "제{ed}회 아산 이순신 백의종군길 마라톤", "제{ed}회 호남마라톤", "{year} 코리아 K 건강마라톤", "제{ed}회 마포 서윤복 마라톤", "제{ed}회 기적의마라톤", "{year} 롯데월드타워 스카이런", "제{ed}회 경기마라톤대회", "제{ed}회 동작구청장배 마라톤", "제{ed}회 아산신정호 트레일런 100K", "{year} 서울클린뷰티런", "제{ed}회 춘천호반마라톤", "{year} KOLON TRAIL RUN", "경기지구청년회의소 지구회장배 마라톤", "{year} 키움런", "{year} 꿈나무에게 희망을 마라톤", "{year} 승가원 기부런", "{year} 개화산 트레일러닝", "부산 이기대트레일런", "{year} PLAY TRUE RUN", "제{ed}회 영남일보 국제 하프마라톤", "제{ed}회 해평 마라톤", "제{ed}회 세종특별자치시 전국복사꽃 마라톤", "제{ed}회 창원야철마라톤", "제{ed}회 MBC섬진강꽃길마라톤", "산이정원 패밀리 ESG RACE STEP1", "{year} 하남시육상연맹회장기 벚꽃마라톤", "제{ed}회 양천마라톤", "제{ed}회 청남대울트라 마라톤", "{year} MBN 선셋마라톤 영종", "{year} 대청호 벚꽃길 마라톤", "소외계층돕기 제{ed}회 행복한가게 마라톤", "제{ed}회 서울트레일런", "{year} 세이브더칠드런 국제어린이마라톤", "제{ed}회 서울봄꽃레이스", "{year} 영주소백산마라톤", "{year} 진주남강 마라톤", "{year} 군산 새만금마라톤", "{year} 더레이스 서울 21K", "제{ed}회 이천 도자기 마라톤", "제{ed}회 나주영산강마라톤", "{year} 튼튼이 마라톤", "제{ed}회 기브앤레이스", "제{ed}회 전남대 5·18 캠퍼스 마라톤", "국립창원대학교 MBC경남 제{ed}회 벚꽃마라톤", "제{ed}회 예산윤봉길 전국마라톤", "{year} 무해런", "제{ed}회 경주벚꽃마라톤", "제{ed}회 제주 국제울트라마라톤", "{year} 왕인의 봄 영암벚꽃마라톤", "제{ed}회 대한경제마라톤", "오크밸리 힐스 나이트 레이스 10K", "{year} 글로컬 건양대학교 K-국방 마라톤", "수원 광교산트레일런", "제{ed}회 합천벚꽃마라톤", "{year} 무주반딧불 하프마라톤", "제{ed}회 정남진 장흥 전국마라톤", "제{ed}회 한강 벚꽃 마라톤", "{year} 성북사랑 전국 마라톤", "제{ed}회 구로구연맹회장배 마라톤대회", "{year} 청라 하늘대교마라톤", "{year} 은평 불광천 벚꽃마라톤 대회", "{year} 안양천 벚꽃 마라톤", "제{ed}회 태화강 마라톤", "제{ed}회 서귀포 유채꽃국제걷기대회", "{year} 봄바람 유러닝 페스타", "{year} 금강울트라마라톤", "제{ed}회 구리시 걷기&트레일런", "{year} 여수 영취산 진달래 트레일레이스", "제{ed}회 코오롱구간마라톤대회", "제{ed}회 의성마늘마라톤", "제{ed}회 Night Run&Walk in 밀양", "{year} 팀 K리그 런", "제{ed}회 인천국제하프마라톤", "{year} 서울 K-마라톤", "제{ed}회 불패마라톤", "{year} 정읍동학마라톤", "{year} HEAT & RUN", "{year} 산불조심 한국남산우정마라톤", "시흥시 육상연맹 회장배 갯골마라톤", "제{ed}회 버킷런", "입춘대길 제{ed}회 춘천 소양강마라톤", "부천시의장배 철인3종 트레일런대회", "제{ed}회 창녕부곡 온천마라톤", "제{ed}회 보은 보청천 마라톤", "{year} 금산 인삼 마라톤", "{year} 부천국제 10km 로드레이스", "{year} 고양특례시 하프마라톤", "{year} MBN 블루레이스 거제", "제{ed}회 여의도 벚꽃 마라톤", "{year} 전국민 러닝크루 패밀리 마라톤", "{year} 예천군민 마스터즈", "{year} 여수시장배 트레일레이스", "서울 관악산트레일런", "제{ed}회 코리아오픈 레이스", "제{ed}회 대전트레일 스피드런", "제{ed}회 부산 비치울트라 마라톤", "제{ed}회 서울경기육상연합 하프 마라톤", "{year} Run your way HALF RACE SEOUL", "3.1절 기념 제{ed}회 건강달리기", "{year} 환경사랑 부산 K-런", "{year} 구미 박정희 마라톤", "제{ed}회 광주일보 3.1절 전국마라톤", "3.1절 107주년 기념 단축 마라톤", "{year} 보스턴 영웅 마라톤", "부산 영도트레일런", "{year} 3.1런 한국해비타트", "{year} 제주MBC 국제평화마라톤", "{year} 경기수원국제하프마라톤", "{year} 고구려 마라톤", "{year} 챌린지 레이스", "제{ed}회 산불조심 한국서울마라톤", "{year} 청춘릴레이 마라톤", "희망드림 제{ed}회 동계 국제 마라톤", "제{ed}회 휴먼레이스", "{year} 순천만국가정원 윷놀이런", "{year} 평창 대관령 알몸 마라톤", "제{ed}회 산들소리향기마라톤 (리사이클 환경 마라톤)", "{year} 인사이더런 W", "{year} 화성 궁평항 동계 훈련 마라톤", "서울 불암산트레일런", "{year} 코리아 스노우 트레일", "광주 무등산트레일런", "제{ed}회 의림지삼한초록길알몸마라톤", "제{ed}회 여수해양마라톤", "{year} 미즈노 페스타", "{year} 새해 일출런", "{year} 선양 맨몸마라톤", "제{ed}회 월미알몸마라톤", "제{ed}회 시즌오프레이스", "{year} 화순고인돌마라톤", "제{ed}회 양산하프마라톤", "제{ed}회 유관순 평화마라톤", "{year} 스포츠서울 하프 마라톤", "{year} 무등산 구석구석 트레일런", "{year} 긍정하프마라톤", "{year} 서울신문 월미도 런 및 펫 동반걷기", "{year} 경산 삼성현 전국마라톤", "{year} 에버랜드 10K 서킷런", "더 크루 선셋 기부런 in 강촌", "{year} 한강의 기적 마라톤", "제{ed}회 국제신문 부산마라톤", "가을철산불조심한국서울마라톤", "{year} 올림픽데이런 in 전주", "{year} 평화통일마라톤", "{year} 마인드 런 페스티벌", "제{ed}회 대구광역시장기 생활체육 육상대회", "{year} 영암모터피아 아울림 육상대회", "{year} 지리산 단감레이스", "제{ed}회 거제 노자산트레일런", "{year} 안산시장배 전국 마스터즈 최강전", "{year} 글로벌 6k 마라톤 - 고양", "{year} 탄소중립을 위한 부천기부런 마라톤", "{year} 임춘애와 함께하는 전국 트랙 페스타", "{year} 다둔 스카이레이스", "경북 백두대간 트레일6 챌린지(김천)", "{year} 김해아름누리길 마라톤", "버거강정런(제{ed}회 강남구청장배 육상대회)", "{year} 쥬라기런", "{year} 인제스피디움 레이스", "{year} 양주시 건강달리기 대회", "{year} 블루런", "제{ed}회 온코런(OncoRun)", "제{ed}회 평화 울트라마라톤", "{year} 우이런", "W STYLE RUN 10K", "{year} 인천육상연맹회장배 아라뱃길 마라톤", "{year} 백두대간 트레일러닝", "{year} 슬로우슬로우 퀵퀵 런", "{year} 전마협 대전 코리아 마스터즈 최강전", "{year} 연천 손기정 마라톤", "{year} 옥수수런 in 영월", "{year} 금강산 누리길 마라톤", "제{ed}회 김천손 미륵산 임도 마라톤", "{year} 강철 런페스타 IN 충북 보은", "서울 대모산트레일런", "{year} 동작청년 기부마라톤", "{year} KAC GIVE RUNWAY", "제{ed}회 유성국화마라톤", "제{ed}회 아름다운제주국제마라톤", "{year} 부천마라톤", "{year} 아시아오픈마라톤 서울시리즈", "10K 챌린지 서울", "청양군 칠갑타워 준공기념 전국마라톤대회", "제{ed}회 금천구청장배 건강달리기", "{year} 산림청장배 영양전국산악마라톤", "{year} 대구 그란페스타", "{year} 배움이 자라는 기부런, 런앤런", "{year} 정읍내장산트레일러닝", "{year} 의정부 하천마라톤", "제{ed}회 위런위로", "제{ed}회 광주평화통일마라톤", "제{ed}회 효도밥상 마라톤", "{year} 꽈자런", "{year} 영암모터피아 F1마라톤", "제{ed}회 오산독산성 전국 하프마라톤", "{year} 최강 백령 마라톤", "개원120주년광주기독병원 광주남구청장배 마라톤", "{year} 렛츠런파크 서울 경주로마라톤", "{year} NIKE RUN JEJU", "{year} Trans Jeju UTMB", "{year} 빵빵런 in 대전", "{year} 뉴런 한강마라톤", "제{ed}회 유네스코 세계지질공원 무등산권지오마라톤", "{year} 디즈니런", "{year} 라이트런 in Seoul", "{year} 댕댕런in 대전", "{year} 애니멀런 서울", "{year} 수원교구 생명사랑 마라톤", "제{ed}회 울트라서울", "경북도청 이전 10주년 경북 하프 마라톤", "글로벌 허브 부산 런페스타", "제{ed}회 전우마라톤", "{year} G밸리 넥타이런", "제{ed}회 전국부부가족마라톤대회", "{year} 서울어스마라톤대회", "잠수교 10K 나이트런", "이봉주 보스턴제패기념 제{ed}회 홍성마라톤", "{year} 인천키즈마라톤", "{year} 산리오 올리브영 큐트런", "{year} 광주 청년 마라톤", "{year} KTX 광명역 평화 마라톤", "제{ed}회 울산 동구 염포산 전국마라톤대회", "{year} MARVEL RUN SEOUL", "대구 한티가는길트렐런", "{year} 영덕블루로드&코리아둘레길 트레일런", "{year} 창원 그란페스타 러닝", "{year} 광산구 양성평등 동행마라톤", "지리산 릿지 레이스", "{year} 달빛소나타", "{year} 설레임 RUN", "포항 호미반도트레일", "제{ed}회 선샤인 런", "{year} 순천야광레이스", "{year} 행복안전동행 마라톤", "서울 북한산 트레일", "제{ed}회 울산태화강울트라마라톤", "{year} 스피드업 라이트 금산 마라톤 대회", "{year} 월드비전 글로벌 6K 마라톤", "SNTR 성남누비길트레일러닝대회", "춘천봄내마라톤대회 및 제{ed}회 강원도민달리기대회", "제{ed}회 양평이봉주마라톤겸 경인일보남한강마라톤", "{year} 지구런 : 더 피스로드", "제{ed}회 제주국제관광마라톤축제", "{year} 구리 유채꽃 마라톤", "마라톤 52 투게더 레이스", "{year} 라이트업! 키즈레이스", "안산청년회의소 회장배 마라톤대회", "{year} 컬처런 영종국제도시 마라톤대회", "{year} 사랑의 쌀나누기 기금마련마라톤", "제{ed}회 전주마라톤", "제{ed}회 대전한밭벌 울트라마라톤대회", "{year} 도시가스 온런 광주", "제{ed}회 화이트런", "제{ed}회 기적의 마라톤 with 이봉주", "제{ed}회 부산마라톤", "{year} 우리은행배 제물포르네상스 국제 마라톤", "{year} 밀양 아리랑트레일런", "{year} 한강 하프 마라톤", "{year} 평화의 섬 제주국제마라톤", "KOREA 50K", "{year} 국민고향 남해마시고RUN", "{year} 내포 마라톤", "제{ed}회 김포한강 마라톤", "{year} 서울 YMCA 마라톤", "로봇랜드와 함께하는 제{ed}회 창원야철마라톤", "대구팔공산 소능종주32k", "통영 한산섬트레일", "{year} 목포 유달산 마라톤", "제{ed}회 장수트레일레이스", "{year} 국제 12 & 24시간주", "{year} 전마협 무안 해변마라톤", "제{ed}회 성우하이텍배 KNN 환경마라톤", "{year} 지리산 봄꽃레이스", "{year} 성남런페스티벌", "{year} 성주 참외 전국마라톤", "대구앞산붕어빵트레일", "나 혼자 뛴다(Survival Untact)", "제{ed}회 전국 새해알몸마라톤"];
+
+  // 어느 대회에나 나오는 말은 이름 비교에서 뺀다
+  const GENERIC_BIGRAMS = new Set(['마라', '라톤', '톤대', '대회', '전국', '국마', '제회', '회장', '기록', '록증', '완주', '주기', '축제']);
+  // 참고 목록 비교에서 무시할 흔한 말 (대회명마다 들어가는 단어)
+  const REF_COMMON = new Set(['마라', '라톤', '톤대', '대회', '전국', '국제', '하프', '트레', '레일', '레이', '이스', '러닝', '축제', '페스', '스티', '티벌', '회장', '장배', '청장', '시장', '구청', '체육', '육회', '달리', '리기', '걷기', '육상', '상연', '연맹', '일보', '아일', '신문']);
+  function bigrams(s) {
+    const t = String(s).replace(/제\s*\d+\s*회/g, '').replace(/20\d\d/g, '').replace(/[^가-힣A-Za-z]/g, '').toUpperCase();
+    const out = new Set();
+    for (let i = 0; i < t.length - 1; i++) { const b = t.slice(i, i + 2); if (!GENERIC_BIGRAMS.has(b)) out.add(b); }
+    return out;
+  }
+  function editionOf(passes) {
+    const v = new Map();
+    for (const p of passes) {
+      if (p.kind !== 'text') continue;
+      const re = /제\s*(\d{1,3})\s*\??\s*[회희]/g; let m;
+      while ((m = re.exec(p.text))) if (+m[1] > 0 && +m[1] < 200) addVote(v, m[1], 1);
+    }
+    const r = ranked(v); return r.length ? +r[0].key : null;
+  }
+  function fillTemplate(tpl, year, ed, base) {
+    let e = ed;
+    if (!e && base && year) e = base[0] + (+year - base[1]);
+    let s = tpl;
+    s = e ? s.replace('{ed}', e) : s.replace(/제\{ed\}회\s*/, '');
+    s = year ? s.replace('{year}', year) : s.replace(/\{year\}\s*/, '');
+    return s.replace(/\s+/g, ' ').trim();
+  }
+  function retargetLearned(name, year, ed) {
+    let s = name;
+    if (ed) s = s.replace(/제\s*\d+\s*회/, `제${ed}회`);
+    if (year) s = s.replace(/^20\d\d(?=\s)/, year);
+    return s;
+  }
+  // 범용 추출: '마라톤/대회/RACE/RUN/달리기'가 들어간 줄을 고르고 쓰레기 글자를 걸러낸다
+  const NAME_KEY = /(마라톤|마라톤대회|달리기|대회|MARATHON|RACE|\bRUN\b|러닝|레이스|축제)/i;
+  const NAME_BAD = /(기록증|CERTIFICATE|연맹|체육회|확인|기원|성공개최|제패기념|공인|참고용|hereby|record of|회장|대표이사|시장)/i;
+  function cleanTitle(line) {
+    line = line
+      .replace(/(완주를?\s*)?축하(드립)?(합)?니다\.?|완주를?/g, ' ')
+      .replace(/마라[톤튼]\s*[대내매][회위희]/g, '마라톤대회').replace(/마란톤/g, '마라톤')
+      .replace(/\s+/g, ' ').trim();
+    const toks = line.split(' ').filter(t => {
+      if (/^(.)\1+$/.test(t)) return false;                              // AAA 같은 반복 글자
+      if (/^제\d{1,3}회$/.test(t)) return true;
+      if (/^20\d\d$/.test(t)) return true;
+      if (/^[가-힣]{2,}$/.test(t)) return true;                         // 한글 단어
+      if (/^[A-Z][A-Z0-9]{2,}$/.test(t)) return true;                   // 대문자 영단어
+      if (/^\d{1,2}K$/i.test(t)) return true;
+      return false;
+    });
+    return toks.join(' ').trim();
+  }
+  function genericName(passes, ed, year) {
+    const votes = new Map();
+    for (const p of passes) {
+      if (p.kind !== 'text') continue;
+      const lines = linesOf(p);
+      lines.forEach((line, i) => {
+        if (!NAME_KEY.test(line) || NAME_BAD.test(line)) return;
+        let t = cleanTitle(line);
+        if (!NAME_KEY.test(t) || t.replace(/\s/g, '').length < 4) return;
+        // 바로 윗줄이 '제N회 지명' 같은 제목 앞부분이면 합친다
+        const prev = cleanTitle(lines[i - 1] || '');
+        if (prev && !NAME_BAD.test(lines[i - 1]) && /^(제\d{1,3}회\s)?[가-힣]{2,}(\s[가-힣]{2,})?$/.test(prev) && prev.length <= 16 && !NAME_KEY.test(prev)) t = `${prev} ${t}`;
+        // 핵심어만 덜렁 있는 줄(MARATHON, RACE)은 점수를 낮춘다
+        const extra = t.split(' ').filter(w => !NAME_KEY.test(w) && !/^20\d\d$/.test(w)).length;
+        const hangul = (t.match(/[가-힣]/g) || []).length;
+        const score = (extra ? 1 : 0.2) + Math.min(hangul, 12) / 12 + Math.min(t.replace(/\s/g, '').length, 20) / 40;
+        addVote(votes, t, score);
+      });
+    }
+    const r = ranked(votes);
+    if (!r.length) return '';
+    // 한글 제목이 있으면 영문 제목보다 우선
+    const ko = r.find(x => (x.key.match(/[가-힣]/g) || []).length >= 4 && x.score >= r[0].score * 0.6);
+    let best = (ko || r[0]).key;
+    if (ed && !/제\d+회/.test(best)) best = `제${ed}회 ${best}`;
+    else if (!ed && year && !/20\d\d/.test(best) && !/제\d+회/.test(best) && /[가-힣]/.test(best)) best = `${year} ${best}`;
+    return best;
+  }
+  function raceName(passes, ctx, knownRaceNames, useDictionary) {
+    const all = passes.filter(p => p.kind === 'text').map(p => p.text).join('\n');
+    const ed = editionOf(passes);
+    // (0) 기록증에 '대회명' 칸이 있으면 그 값이 정답
+    const lv = new Map();
+    for (const p of passes) {
+      if (p.kind !== 'text') continue;
+      for (const line of linesOf(p)) {
+        const m = line.match(/(대\s*회\s*명|\bEvent\))(.*)$/i);
+        if (!m) continue;
+        const t = cleanTitle(m[2].replace(/^[^\s]*\s/, ' '));
+        if (NAME_KEY.test(t) && /[가-힣]{2,}/.test(t)) addVote(lv, t, 1);
+      }
+    }
+    const lr = ranked(lv);
+    if (lr.length) return { name: lr[0].key, source: 'label', conf: 'high' };
+    // (1) 내장 사전
+    for (const r of (useDictionary === false ? [] : RACE_DICT)) {
+      const okAll = !r.all || r.all.every(re => re.test(all));
+      const okAny = !r.any || r.any.some(re => re.test(all));
+      if (okAll && okAny) return { name: fillTemplate(r.name, ctx.year, ed, r.base), source: 'dictionary', conf: 'high' };
+    }
+    // (2) 이미 DB에 등록된 대회명과 글자쌍(bigram) 유사도 비교 → 쓸수록 똑똑해진다
+    const textBg = bigrams(all);
+    let best = null;
+    for (const n of knownRaceNames || []) {
+      const nb = bigrams(n); if (nb.size < 2) continue;
+      let hit = 0; nb.forEach(b => { if (textBg.has(b)) hit++; });
+      const sc = hit / nb.size;
+      if (hit >= 2 && sc >= 0.6 && (!best || sc > best.sc)) best = { n, sc };
+    }
+    if (best) return { name: retargetLearned(best.n, ctx.year, ed), source: 'learned', conf: best.sc >= 0.8 ? 'high' : 'mid' };
+    // (2.5) 참고 대회 목록: 한글 글자쌍만 비교, 엄격한 기준 + 2등과 차이가 있을 때만
+    const hangulBg = (x) => new Set([...bigrams(x)].filter(b => /^[가-힣]{2}$/.test(b) && !REF_COMMON.has(b)));
+    const textKo = hangulBg(all);
+    const scored = [];
+    for (const tpl of REF_RACES) {
+      const nb = hangulBg(tpl.replace(/\{year\}|제\{ed\}회/g, ''));
+      if (nb.size < 3) continue;
+      let hit = 0; nb.forEach(b => { if (textKo.has(b)) hit++; });
+      scored.push({ tpl, sc: hit / nb.size, hit });
+    }
+    scored.sort((a, b) => b.sc - a.sc || b.hit - a.hit);
+    if (scored.length && scored[0].sc >= 0.75 && scored[0].hit >= 3 && (!scored[1] || scored[0].sc - scored[1].sc >= 0.1)) {
+      return { name: fillTemplate(scored[0].tpl, ctx.year, ed), source: 'reference', conf: scored[0].sc >= 0.9 ? 'mid' : 'low' };
+    }
+    // (3) 범용 추출
+    const g = genericName(passes, ed, ctx.year);
+    if (g) return { name: g, source: 'generic', conf: 'low' };
+    return { name: '', source: 'none', conf: 'none' };
+  }
+
+  // ---------- 종합 ----------
+  function parseCertificate(passes, opts) {
+    opts = opts || {};
+    const today = opts.today || new Date().toISOString().slice(0, 10);
+    const conf = {};
+
+    const dates = dateCandidates(passes, today);
+    const date = dates.length ? dates[0].key : '';
+    conf.date = !dates.length ? 'none' : dates[0].score >= 3 ? 'high' : 'low';
+    let year = date ? date.slice(0, 4) : '';
+    if (!year) {
+      const yv = new Map();
+      passes.forEach(p => (p.text.match(/(?<!\d)20[12]\d(?!\d)/g) || []).forEach(y => addVote(yv, y, 1)));
+      const ry = ranked(yv); year = ry.length ? ry[0].key : '';
+    }
+    const ctx = { year };
+
+    const cats = categoryCandidates(passes);
+    const times = timeCandidates(passes);
+
+    // 종목이 확실하면 그 거리에서 말이 되는 기록만, 아니면 기록으로 종목을 추정
+    let category = cats.length ? cats[0].key : null;
+    let time = null;
+    if (category) time = times.find(t => plausible(t.extra.sec, category)) || null;
+    if (!time && times.length) time = times[0];
+    if (!category && time) {
+      const sec = time.extra.sec;
+      category = sec < 75 * 60 ? '10K' : sec < 3 * 3600 ? 'Half' : 'Full';
+      conf.category = 'low';
+    } else conf.category = !category ? 'none' : cats[0].score >= 3 ? 'high' : 'mid';
+    if (!category) category = 'Full';
+    conf.time = !time ? 'none' : time.hits >= 2 ? 'high' : 'low';
+    // 완주하지 못한 기록증 (DNF/DNS/DSQ)
+    const status = !time ? ((passes.map(p => p.text).join(' ').match(/\b(DNF|DNS|DSQ)\b/) || [])[1] || '') : '';
+
+    const bibs = bibCandidates(passes, ctx).filter(b => b.score >= 1.2);
+    const bib = bibs.length ? bibs[0].key : '';
+    conf.bib = !bibs.length ? 'none' : bibs[0].score >= 3 ? 'high' : 'low';
+
+    const nm = raceName(passes, ctx, opts.knownRaceNames, opts.useDictionary);
+    conf.name = nm.conf;
+
+    return {
+      name: nm.name,
+      nameSource: nm.source,
+      category,
+      distanceKm: DIST[category] || 42.195,
+      hours: time ? time.extra.h : 0,
+      minutes: time ? time.extra.mi : 0,
+      seconds: time ? time.extra.s : 0,
+      bib,
+      date,
+      status,
+      confidence: conf,
+      debug: { times: times.slice(0, 4), cats, bibs: bibs.slice(0, 4), dates: dates.slice(0, 4) }
+    };
+  }
+
+  const api = { parseCertificate, RACE_DICT, _internals: { timeCandidates, categoryCandidates, bibCandidates, dateCandidates, genericName, bigrams } };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.PBPBCertParser = api;
+})(typeof window !== 'undefined' ? window : globalThis);
+  </script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
     body { background-color: #030712; color: #f3f4f6; padding-bottom: 60px; min-height: 100vh; }
     .container { max-width: 680px; margin: 0 auto; padding: 16px; }
     
-    header { padding: 16px 0 20px; border-bottom: 1px solid #1f2937; margin-bottom: 20px; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); margin-bottom: 6px; }
-    h1 { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
+    header { padding: 12px 0 16px; border-bottom: 1px solid #1f2937; margin-bottom: 16px; }
     
+    /* Top Logo & Status Bar */
+    .top-brand-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    
+    /* PBPB Official Logo (시안 1 트랙+시계 + 네온 시안) */
+    .pbpb-logo-wrap { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+    .pbpb-icon-box {
+      width: 38px; height: 38px; border-radius: 10px; background: #020617;
+      border: 1.5px solid #38bdf8; box-shadow: 0 0 14px rgba(56, 189, 248, 0.3), inset 0 0 8px rgba(56, 189, 248, 0.15);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .pbpb-text-box { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+    .pbpb-main-title {
+      font-size: 19px; font-weight: 900; color: #ffffff; line-height: 1; letter-spacing: -0.2px;
+      display: flex; align-items: center; gap: 2px;
+    }
+    .pbpb-main-title .cyan-accent { color: #38bdf8; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
+    .pbpb-main-title .dot { color: #38bdf8; font-size: 16px; margin: 0 1px; }
+    .pbpb-sub-title {
+      font-size: 9px; font-weight: 800; color: #7dd3fc; letter-spacing: 0.8px;
+      white-space: nowrap; margin-top: 3px; opacity: 0.9;
+    }
+
     .btn-group { display: flex; gap: 8px; margin-top: 14px; }
     .btn { flex: 1; padding: 12px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.15s; white-space: nowrap; flex-shrink: 0; }
     .btn-primary { background: #10b981; color: #022c22; }
@@ -47,7 +502,7 @@
     .tag-half { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; }
     .tag-10k { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; }
     .rec-date { font-size: 11px; color: #6b7280; }
-    .rec-name { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 8px; line-height: 1.3; }
+    .rec-name { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 8px; line-height: 1.35; word-break: keep-all; }
     
     .rec-info-bar { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1e293b; padding-top: 10px; margin-top: 6px; }
     .rec-time { font-size: 20px; font-weight: 900; color: #ffffff; font-variant-numeric: tabular-nums; }
@@ -98,17 +553,17 @@
     .auth-tab-btn { flex: 1; padding: 10px; font-weight: 700; font-size: 13px; background: transparent; border: none; color: #9ca3af; border-bottom: 2px solid transparent; cursor: pointer; }
     .auth-tab-btn.active { color: #10b981; border-bottom: 2px solid #10b981; }
 
-  
-    /* Main Navigation Tabs */
-    .main-nav { display: flex; gap: 8px; margin-bottom: 18px; border-bottom: 1px solid #1f2937; padding-bottom: 2px; }
-    .nav-tab-btn { flex: 1; padding: 12px 6px; font-weight: 800; font-size: 13px; background: transparent; border: none; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; }
+    /* Main Navigation Tabs (4 Tabs) */
+    .main-nav { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid #1f2937; padding-bottom: 2px; overflow-x: auto; scrollbar-width: none; }
+    .main-nav::-webkit-scrollbar { display: none; }
+    .nav-tab-btn { flex: 1; min-width: 75px; padding: 11px 4px; font-weight: 800; font-size: 12.5px; background: transparent; border: none; color: #64748b; border-bottom: 3px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: 0.2s; white-space: nowrap; }
     .nav-tab-btn.active { color: #10b981; border-bottom: 3px solid #10b981; }
 
-    /* Feed Filter Sub-tabs */
-    .feed-sub-nav { display: flex; gap: 6px; margin-bottom: 14px; }
-    .sub-filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #111827; color: #94a3b8; border: 1px solid #1f2937; cursor: pointer; }
+    /* Sub-nav Filters (Feed & Ranking) */
+    .filter-sub-nav { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+    .filter-sub-nav::-webkit-scrollbar { display: none; }
+    .sub-filter-btn { padding: 6px 13px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #111827; color: #94a3b8; border: 1px solid #1f2937; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
     .sub-filter-btn.active { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
-
 
     /* Modern HUD Feed Card Styles */
     .feed-card {
@@ -128,10 +583,10 @@
       background: linear-gradient(90deg, transparent, #38bdf8, #10b981, transparent);
     }
     .feed-author-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .feed-author-info { display: flex; align-items: center; gap: 9px; cursor: pointer; }
-    .feed-avatar { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid #10b981; background: #030712; flex-shrink: 0; }
-    .feed-author-name { font-size: 14px; font-weight: 800; color: #ffffff; line-height: 1.2; }
-    .feed-date-line { font-size: 11px; color: #64748b; margin-top: 1px; }
+    .feed-author-info { display: flex; align-items: center; gap: 9px; cursor: pointer; min-width: 0; flex: 1; }
+    .feed-avatar { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid #10b981; background: #030712; flex-shrink: 0; object-fit: cover; }
+    .feed-author-name { font-size: 14px; font-weight: 800; color: #ffffff; line-height: 1.2; display: flex; align-items: center; gap: 4px; }
+    .feed-date-line { font-size: 11px; color: #64748b; margin-top: 1px; word-break: keep-all; }
 
     /* 2-column Body Layout */
     .feed-main-body {
@@ -154,7 +609,6 @@
       justify-content: space-between;
       min-width: 0;
     }
-    /* 대회명: 줄바꿈 허용하여 모바일에서도 절대 잘리지 않음 */
     .feed-race-name-full {
       font-size: 15px;
       font-weight: 800;
@@ -164,7 +618,6 @@
       margin-bottom: 8px;
     }
 
-    /* 타이머 + 종목 배지 인라인 결합 */
     .feed-time-badge-row {
       display: flex;
       align-items: baseline;
@@ -189,7 +642,6 @@
       letter-spacing: 0.3px;
     }
 
-    /* 메트릭 칩스 (페이스 & 배번만 간결하게) */
     .feed-hud-chips { display: flex; flex-wrap: wrap; gap: 5px; }
     .feed-hud-chip {
       background: rgba(255, 255, 255, 0.05);
@@ -204,7 +656,6 @@
     }
     .feed-hud-chip b { color: #10b981; font-weight: 800; }
 
-    /* 우측 세로형 실물 기록증 포스터 프리뷰 */
     .feed-cert-poster {
       position: relative;
       width: 95px;
@@ -243,7 +694,6 @@
       color: #38bdf8;
     }
 
-    /* 확장된 대회 후기 / 소감 박스 */
     .feed-notes-box {
       margin-top: 10px;
       background: rgba(255, 255, 255, 0.025);
@@ -257,7 +707,6 @@
       white-space: pre-wrap;
     }
 
-    /* 하단 인터랙션 바 */
     .feed-interact-bar {
       display: flex;
       align-items: center;
@@ -266,7 +715,6 @@
       padding-top: 8px;
       border-top: 1px solid #141f2e;
     }
-    /* 간결해진 박수 버튼: 아이콘 + 숫자만 */
     .clap-btn-mini {
       background: #141e2e;
       border: 1px solid rgba(16, 185, 129, 0.25);
@@ -295,21 +743,117 @@
     .btn-follow.follow { background: #10b981; color: #022c22; }
     .btn-follow.following { background: #1f2937; color: #94a3b8; border: 1px solid #374151; }
 
-  </style>
+    /* 3. Ranking View Styles */
+    .rank-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; transition: 0.15s;
+    }
+    .rank-item:hover { border-color: #374151; background: #141c2c; }
+    .rank-item.top1 { border-color: rgba(234, 179, 8, 0.45); background: linear-gradient(135deg, rgba(234, 179, 8, 0.1), #111827); }
+    .rank-item.top2 { border-color: rgba(148, 163, 184, 0.45); background: linear-gradient(135deg, rgba(148, 163, 184, 0.1), #111827); }
+    .rank-item.top3 { border-color: rgba(180, 83, 9, 0.45); background: linear-gradient(135deg, rgba(180, 83, 9, 0.1), #111827); }
+
+    .rank-medal-badge { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 900; flex-shrink: 0; }
+    .rank-medal-badge.m1 { background: #eab308; color: #451a03; }
+    .rank-medal-badge.m2 { background: #94a3b8; color: #0f172a; }
+    .rank-medal-badge.m3 { background: #b45309; color: #fff; }
+    .rank-medal-badge.mdefault { background: #1f2937; color: #64748b; font-size: 12px; }
+
+    /* Batch Upload Progress Styles */
+    .batch-progress-box { background: #090e18; border: 1px solid #1f2937; border-radius: 14px; padding: 16px; margin: 14px 0; text-align: center; }
+    .batch-progress-track { width: 100%; height: 8px; background: #1f2937; border-radius: 4px; overflow: hidden; margin: 10px 0 6px; }
+    .batch-progress-bar { height: 100%; background: #10b981; width: 0%; transition: width 0.3s ease; }
+
+    /* Cropper Modal Styles */
+    .cropper-container-box { width: 100%; max-height: 340px; aspect-ratio: 1/1; margin: 0 auto 14px; overflow: hidden; background: #000; border-radius: 12px; }
+    .cropper-view-box, .cropper-face { border-radius: 50% !important; }
+  
+    /* Choice Modal Action Cards */
+    .choice-card-btn {
+      width: 100%;
+      padding: 13px 14px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: 0.15s;
+      white-space: normal !important;
+      border: 1px solid #1f2937;
+    }
+    .choice-card-btn:active { transform: scale(0.98); }
+    .choice-card-btn.batch-card { background: #0b1322; border-color: rgba(56,189,248,0.4); }
+    .choice-card-btn.batch-card:hover { border-color: #38bdf8; background: #0f1c33; }
+    .choice-card-btn.ocr-card { background: #0b171c; border-color: rgba(16,185,129,0.35); }
+    .choice-card-btn.ocr-card:hover { border-color: #10b981; background: #0e2424; }
+    .choice-card-btn.manual-card { background: #10b981; border-color: #10b981; }
+    .choice-card-btn.manual-card:hover { background: #059669; }
+
+    .choice-icon-wrap {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .choice-text-col {
+      min-width: 0;
+      flex: 1;
+      white-space: normal;
+    }
+    .choice-main-text {
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 2px;
+      line-height: 1.25;
+    }
+    .choice-sub-text {
+      font-size: 11px;
+      line-height: 1.35;
+      word-break: keep-all;
+      white-space: normal;
+    }
+
+    /* OCR 확인 필요 표시 */
+    .form-input.needs-check, .cat-buttons.needs-check { border-color: #f59e0b !important; box-shadow: 0 0 0 2px rgba(245,158,11,0.25); border-radius: 10px; }
+    .cat-buttons.needs-check { padding: 3px; border: 1px solid #f59e0b; }
+    .ocr-check-note { font-size: 11.5px; line-height: 1.45; color: #fde68a; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.35); border-radius: 10px; padding: 8px 10px; margin-bottom: 12px; word-break: keep-all; }
+    .ocr-check-note.ok { color: #a7f3d0; background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.35); }
+</style>
 </head>
 <body>
   <div class="container">
     <header>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div class="badge">MARATHON ARCHIVE</div>
-        <div id="cloud-status-badge" style="font-size:11px;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:6px;border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;gap:4px;">☁️ 클라우드 동기화 완료</div>
+      <!-- 상단 공식 브랜드 로고 & 동기화 상태 바 -->
+      <div class="top-brand-bar">
+        <div class="pbpb-logo-wrap" onclick="switchMainView('archive')" title="PBPB 메인 홈으로">
+          <div class="pbpb-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 6 12 12 16 14"/>
+              <path d="M12 2v2m10 8h-2M2 12h2" stroke="#7dd3fc" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="pbpb-text-box">
+            <div class="pbpb-main-title">PB<span class="dot">:</span><span class="cyan-accent">PB</span></div>
+            <div class="pbpb-sub-title">PERSONAL BEST PACE BOOK</div>
+          </div>
+        </div>
+
+        <div id="cloud-status-badge" style="font-size:11px;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:6px;border:1px solid rgba(56,189,248,0.3);display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;">☁️ 클라우드 동기화 완료</div>
       </div>
 
       <!-- 러너 프로필 및 로그인 상태 바 -->
       <div id="auth-bar" class="user-profile-bar">
         <div class="user-profile-info" id="user-profile-display" style="display:none;">
           <img id="user-avatar-img" class="user-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=runner" alt="프로필">
-          <div>
+          <div style="min-width:0;flex:1;">
             <div class="user-name-title">
               <span id="user-nickname-text">러너</span>
               <button class="icon-btn" onclick="openProfileModal()" title="프로필 수정" style="padding:3px;background:none;border:none;">
@@ -327,8 +871,8 @@
         </div>
       </div>
 
-      <h1 id="app-heading-title">나의 마라톤 완주 기록 아카이브</h1>
-      <div class="btn-group" style="margin-top:14px;">
+      <!-- 상단 액션 버튼 그룹 (불필요한 대형 타이틀 삭제 완료) -->
+      <div class="btn-group">
         <button class="btn btn-primary" onclick="openChoiceModal()" style="padding:14px 16px;font-size:14px;box-shadow:0 4px 14px rgba(16,185,129,0.25);flex:1.2;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v16m8-8H4"/></svg>
           기록 추가하기
@@ -338,83 +882,90 @@
           PB 공유하기
         </button>
       </div>
+
+      <!-- 단일 및 대량 파일 인풋 -->
       <input type="file" id="hiddenOcrInput" accept="image/*" style="display:none;" onchange="handleOcrFile(this)">
+      <input type="file" id="hiddenBatchInput" accept="image/*" multiple style="display:none;" onchange="handleBatchOcrFiles(this)">
     </header>
-    <!-- 메인 네비게이션 탭 -->
+
+    <!-- 메인 4단 내비게이션 탭 -->
     <nav class="main-nav">
       <button class="nav-tab-btn active" id="tab-btn-archive" onclick="switchMainView('archive')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
         내 기록실
       </button>
       <button class="nav-tab-btn" id="tab-btn-feed" onclick="switchMainView('feed')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         뉴스피드
       </button>
+      <button class="nav-tab-btn" id="tab-btn-ranking" onclick="switchMainView('ranking')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-2.34"/><path d="M14 14.66V17c0 .55.45 1 1 1h2c.55 0 1-.45 1-1v-2.34"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+        랭킹
+      </button>
       <button class="nav-tab-btn" id="tab-btn-runners" onclick="switchMainView('runners')">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         러너 탐색
       </button>
     </nav>
 
-    <!-- 1. 내 아카이브 뷰 -->
+    <!-- 1. 내 기록실 뷰 -->
     <div id="view-archive">
       <div class="section-title">완주 현황 및 종목별 PB</div>
-    <div class="count-grid">
-      <div class="count-card">
-        <div class="count-label">10km 코스</div>
-        <div class="count-val" id="cnt-10k">0<span style="font-size:11px;font-weight:400;color:#6b7280;margin-left:2px;">회</span></div>
+      <div class="count-grid">
+        <div class="count-card">
+          <div class="count-label">10km 코스</div>
+          <div class="count-val" id="cnt-10k">0<span style="font-size:11px;font-weight:400;color:#6b7280;margin-left:2px;">회</span></div>
+        </div>
+        <div class="count-card">
+          <div class="count-label">하프 (Half)</div>
+          <div class="count-val" id="cnt-half">0<span style="font-size:11px;font-weight:400;color:#6b7280;margin-left:2px;">회</span></div>
+        </div>
+        <div class="count-card">
+          <div class="count-label">풀코스 (Full)</div>
+          <div class="count-val full" id="cnt-full">0<span style="font-size:11px;font-weight:400;color:#6b7280;margin-left:2px;">회</span></div>
+        </div>
       </div>
-      <div class="count-card">
-        <div class="count-label">하프 (Half)</div>
-        <div class="count-val" id="cnt-half">0<span style="font-size:11px;font-weight:400;color:#6b7280;margin-left:2px;">회</span></div>
-      </div>
-      <div class="count-card">
-        <div class="count-label">풀코스 (Full)</div>
-        <div class="count-val full" id="cnt-full">0<span style="font-size:11px;font-weight:400;color:#6b7280;margin-left:2px;">회</span></div>
-      </div>
-    </div>
 
-    <div class="pb-grid">
-      <div class="pb-card" id="pb-10k-card">
-        <div class="pb-header">
-          <span style="font-size:11px;font-weight:800;color:#38bdf8;">10KM PB</span>
-          <span class="pb-badge">BEST</span>
+      <div class="pb-grid">
+        <div class="pb-card" id="pb-10k-card">
+          <div class="pb-header">
+            <span style="font-size:11px;font-weight:800;color:#38bdf8;">10KM PB</span>
+            <span class="pb-badge">BEST</span>
+          </div>
+          <div class="pb-time" id="pb-10k-time">--:--:--</div>
+          <div class="pb-pace" id="pb-10k-pace">기록 없음</div>
+          <div class="pb-meta" id="pb-10k-meta">참가 이력 없음</div>
         </div>
-        <div class="pb-time" id="pb-10k-time">--:--:--</div>
-        <div class="pb-pace" id="pb-10k-pace">기록 없음</div>
-        <div class="pb-meta" id="pb-10k-meta">참가 이력 없음</div>
-      </div>
-      <div class="pb-card" id="pb-half-card">
-        <div class="pb-header">
-          <span style="font-size:11px;font-weight:800;color:#818cf8;">HALF PB</span>
-          <span class="pb-badge" style="background:rgba(99,102,241,0.15);color:#a5b4fc;">BEST</span>
+        <div class="pb-card" id="pb-half-card">
+          <div class="pb-header">
+            <span style="font-size:11px;font-weight:800;color:#818cf8;">HALF PB</span>
+            <span class="pb-badge" style="background:rgba(99,102,241,0.15);color:#a5b4fc;">BEST</span>
+          </div>
+          <div class="pb-time" id="pb-half-time">--:--:--</div>
+          <div class="pb-pace" id="pb-half-pace">기록 없음</div>
+          <div class="pb-meta" id="pb-half-meta">참가 이력 없음</div>
         </div>
-        <div class="pb-time" id="pb-half-time">--:--:--</div>
-        <div class="pb-pace" id="pb-half-pace">기록 없음</div>
-        <div class="pb-meta" id="pb-half-meta">참가 이력 없음</div>
-      </div>
-      <div class="pb-card" id="pb-full-card">
-        <div class="pb-header">
-          <span style="font-size:11px;font-weight:800;color:#34d399;">FULL PB</span>
-          <span class="pb-badge" style="background:rgba(16,185,129,0.15);color:#34d399;">BEST</span>
+        <div class="pb-card" id="pb-full-card">
+          <div class="pb-header">
+            <span style="font-size:11px;font-weight:800;color:#34d399;">FULL PB</span>
+            <span class="pb-badge" style="background:rgba(16,185,129,0.15);color:#34d399;">BEST</span>
+          </div>
+          <div class="pb-time" id="pb-full-time">--:--:--</div>
+          <div class="pb-pace" id="pb-full-pace">기록 없음</div>
+          <div class="pb-meta" id="pb-full-meta">참가 이력 없음</div>
         </div>
-        <div class="pb-time" id="pb-full-time">--:--:--</div>
-        <div class="pb-pace" id="pb-full-pace">기록 없음</div>
-        <div class="pb-meta" id="pb-full-meta">참가 이력 없음</div>
       </div>
-    </div>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div class="section-title" style="margin-bottom:0;">완주 기록 히스토리 (최신순)</div>
-      <span style="font-size:11px;color:#6b7280;" id="rec-total-count">0개</span>
-    </div>
-    <div id="records-list"></div>
-  </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div class="section-title" style="margin-bottom:0;">완주 기록 히스토리 (최신순)</div>
+        <span style="font-size:11px;color:#6b7280;" id="rec-total-count">0개</span>
+      </div>
+      <div id="records-list"></div>
     </div>
 
     <!-- 2. 뉴스피드 뷰 -->
     <div id="view-feed" style="display:none;">
-      <div class="feed-sub-nav">
+      <div class="filter-sub-nav">
         <button class="sub-filter-btn active" id="sub-filter-all" onclick="setFeedFilter('all')">전체 러너 피드</button>
         <button class="sub-filter-btn" id="sub-filter-following" onclick="setFeedFilter('following')">내가 팔로우한 러너</button>
       </div>
@@ -423,7 +974,25 @@
       </div>
     </div>
 
-    <!-- 3. 러너 탐색 뷰 -->
+    <!-- 3. 종목별 랭킹 뷰 (신설) -->
+    <div id="view-ranking" style="display:none;">
+      <!-- 범위 필터 -->
+      <div class="filter-sub-nav" style="margin-bottom:8px;">
+        <button class="sub-filter-btn active" id="rank-scope-all" onclick="setRankingScope('all')">전체 러너 기준</button>
+        <button class="sub-filter-btn" id="rank-scope-following" onclick="setRankingScope('following')">내가 팔로우한 러너 기준</button>
+      </div>
+      <!-- 종목 필터 -->
+      <div class="filter-sub-nav">
+        <button class="sub-filter-btn active" id="rank-cat-Full" onclick="setRankingCategory('Full')">풀코스 (42.195km)</button>
+        <button class="sub-filter-btn" id="rank-cat-Half" onclick="setRankingCategory('Half')">하프 (21.0975km)</button>
+        <button class="sub-filter-btn" id="rank-cat-10K" onclick="setRankingCategory('10K')">10km 코스</button>
+      </div>
+      <div id="ranking-list-container">
+        <div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">랭킹을 산출하는 중...</div>
+      </div>
+    </div>
+
+    <!-- 4. 러너 탐색 뷰 -->
     <div id="view-runners" style="display:none;">
       <div style="margin-bottom:14px;">
         <input type="text" id="runner-search-input" placeholder="러너 닉네임 검색..." class="form-input" oninput="filterRunnersList()">
@@ -434,32 +1003,61 @@
     </div>
   </div>
 
-  <!-- 등록 방식 선택 팝업 모달 -->
+  <!-- 등록 방식 선택 팝업 모달 (대량 업로드 버튼 추가) -->
   <div id="choice-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeChoiceModal()">
-    <div class="modal-box" style="max-width:380px;text-align:center;padding:22px 18px;">
+    <div class="modal-box" style="max-width:390px;text-align:center;padding:22px 18px;">
       <div style="font-size:17px;font-weight:800;color:#ffffff;margin-bottom:4px;">대회 기록 추가</div>
-      <div style="font-size:12px;color:#9ca3af;margin-bottom:18px;">등록하실 방식을 선택해주세요.</div>
+      <div style="font-size:12px;color:#9ca3af;margin-bottom:16px;">등록하실 방식을 선택해주세요.</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
-        <button class="btn btn-secondary" onclick="handleChoiceSelect('ocr')" style="padding:14px 16px;border-radius:14px;justify-content:flex-start;gap:12px;background:#0d1527;border:1px solid rgba(16,185,129,0.35);text-align:left;">
-          <div style="width:38px;height:38px;border-radius:10px;background:rgba(16,185,129,0.15);display:flex;align-items:center;justify-content:center;color:#34d399;flex-shrink:0;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <!-- 신규: 대량 업로드 버튼 -->
+        <button type="button" class="choice-card-btn batch-card" onclick="handleChoiceSelect('batch')">
+          <div class="choice-icon-wrap" style="background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg>
           </div>
-          <div>
-            <div style="color:#ffffff;font-weight:800;font-size:14px;">기록증 자동인식</div>
-            <div style="color:#94a3b8;font-size:11px;margin-top:2px;">사진을 업로드하면 내용이 자동 입력됩니다</div>
+          <div class="choice-text-col">
+            <div class="choice-main-text" style="color:#ffffff;">기록증 대량 업로드 <span style="font-size:10px;font-weight:800;background:#38bdf8;color:#020617;padding:1px 5px;border-radius:4px;">NEW</span></div>
+            <div class="choice-sub-text" style="color:#94a3b8;">사진을 여러 장 선택하면 일괄 분석하여 자동 등록합니다</div>
           </div>
         </button>
-        <button class="btn btn-primary" onclick="handleChoiceSelect('manual')" style="padding:14px 16px;border-radius:14px;justify-content:flex-start;gap:12px;text-align:left;">
-          <div style="width:38px;height:38px;border-radius:10px;background:rgba(2,44,34,0.3);display:flex;align-items:center;justify-content:center;color:#022c22;flex-shrink:0;">
+
+        <button type="button" class="choice-card-btn ocr-card" onclick="handleChoiceSelect('ocr')">
+          <div class="choice-icon-wrap" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div class="choice-text-col">
+            <div class="choice-main-text" style="color:#ffffff;">기록증 1장 자동인식</div>
+            <div class="choice-sub-text" style="color:#94a3b8;">사진을 올리면 텍스트를 자동 판독합니다</div>
+          </div>
+        </button>
+
+        <button type="button" class="choice-card-btn manual-card" onclick="handleChoiceSelect('manual')">
+          <div class="choice-icon-wrap" style="background:rgba(2,44,34,0.35);color:#022c22;border:1px solid rgba(2,44,34,0.2);">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v16m8-8H4"/></svg>
           </div>
-          <div>
-            <div style="color:#022c22;font-weight:800;font-size:14px;">직접입력</div>
-            <div style="color:#064e3b;font-size:11px;margin-top:2px;">대회 정보와 완주 시간을 직접 입력합니다</div>
+          <div class="choice-text-col">
+            <div class="choice-main-text" style="color:#022c22;">직접입력</div>
+            <div class="choice-sub-text" style="color:#064e3b;">대회 정보와 완주 시간을 직접 입력합니다</div>
           </div>
         </button>
       </div>
       <button type="button" onclick="closeChoiceModal()" style="margin-top:16px;background:none;border:none;color:#6b7280;font-size:12px;cursor:pointer;padding:6px 12px;">닫기</button>
+    </div>
+  </div>
+
+  <!-- 대량 업로드 진행률 모달 -->
+  <div id="batch-progress-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:380px;text-align:center;padding:24px 20px;">
+      <div class="spinner" style="margin:0 auto 14px;"></div>
+      <div style="font-size:16px;font-weight:800;color:#ffffff;margin-bottom:4px;" id="batch-status-title">기록증 대량 분석 중</div>
+      <div style="font-size:12px;color:#9ca3af;margin-bottom:12px;" id="batch-status-sub">사진을 고압축 최적화하고 기록을 추출하고 있습니다.</div>
+      
+      <div class="batch-progress-box">
+        <div style="font-size:13px;font-weight:800;color:#38bdf8;" id="batch-counter-text">1 / 3 완료 (33%)</div>
+        <div class="batch-progress-track">
+          <div class="batch-progress-bar" id="batch-progress-bar"></div>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-top:6px;" id="batch-current-file-text">처리 중...</div>
+      </div>
     </div>
   </div>
 
@@ -469,7 +1067,7 @@
       <div id="ocr-overlay" class="ocr-loader" style="display:none;">
         <div class="spinner"></div>
         <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;">기록증 이미지 분석 중</div>
-        <div style="font-size:12px;color:#34d399;" id="ocr-status-text">7개 대회 통합 정밀 판독 중...</div>
+        <div style="font-size:12px;color:#34d399;" id="ocr-status-text">멀티패스 정밀 판독 중...</div>
       </div>
 
       <div class="modal-header">
@@ -489,7 +1087,6 @@
           </div>
           <input type="file" id="modalCertInput" accept="image/*" class="form-input" style="padding:6px;font-size:11px;" onchange="handleModalCertChange(this)">
 
-          <!-- 업로드된 기록증 사진 미리보기 -->
           <div id="cert-preview-card" class="cert-preview-card" style="display:none;">
             <img id="cert-preview-img" src="" alt="기록증 미리보기" onclick="toggleZoomCertPreview()" title="클릭하여 확대/축소">
             <div style="font-size:10px;color:#94a3b8;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:4px;">
@@ -498,6 +1095,8 @@
           </div>
         </div>
 
+        <div id="ocr-check-note" class="ocr-check-note" style="display:none;"></div>
+
         <div class="form-group">
           <label class="form-label">대회명 *</label>
           <input type="text" id="form-name" required placeholder="예: 2026 서울달리기, 2026 춘천마라톤" class="form-input">
@@ -505,7 +1104,7 @@
 
         <div class="form-group">
           <label class="form-label">참가 종목</label>
-          <div class="cat-buttons">
+          <div class="cat-buttons" id="cat-buttons-wrap">
             <button type="button" class="cat-btn active" data-cat="Full" onclick="selectCategory('Full', 42.195)">Full</button>
             <button type="button" class="cat-btn" data-cat="Half" onclick="selectCategory('Half', 21.0975)">Half</button>
             <button type="button" class="cat-btn" data-cat="10K" onclick="selectCategory('10K', 10.0)">10K</button>
@@ -536,15 +1135,9 @@
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <div class="form-group">
-            <label class="form-label">배번표 번호</label>
-            <input type="text" id="form-bib" placeholder="예: 34789, 12275" class="form-input">
-          </div>
-          <div class="form-group">
-            <label class="form-label">날씨 / 기온</label>
-            <input type="text" id="form-weather" placeholder="예: 맑음 / 15°C" class="form-input">
-          </div>
+        <div class="form-group">
+          <label class="form-label">배번표 번호</label>
+          <input type="text" id="form-bib" placeholder="예: 34789, 12275" class="form-input">
         </div>
 
         <div class="form-group">
@@ -584,7 +1177,6 @@
     </div>
   </div>
 
-  
   <!-- 로그인 / 회원가입 모달 -->
   <div id="auth-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeAuthModal()">
     <div class="modal-box" style="max-width:380px;padding:24px 20px;">
@@ -609,7 +1201,7 @@
         </div>
         <div class="form-group" id="signup-nickname-group" style="display:none;">
           <label class="form-label">러너 닉네임</label>
-          <input type="text" id="auth-nickname" placeholder="예: 은채아빠, 서브4도전자" class="form-input">
+          <input type="text" id="auth-nickname" placeholder="예: 은채이파파, 서브4도전자" class="form-input">
         </div>
         <button type="submit" id="auth-submit-btn" class="btn btn-primary" style="width:100%;padding:13px;font-size:14px;margin-top:14px;">
           로그인
@@ -618,7 +1210,7 @@
     </div>
   </div>
 
-  <!-- 프로필 수정 모달 -->
+  <!-- 프로필 수정 모달 (내 사진 업로드 지원) -->
   <div id="profile-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeProfileModal()">
     <div class="modal-box" style="max-width:400px;padding:24px 20px;">
       <div class="modal-header">
@@ -627,10 +1219,12 @@
       </div>
       <form onsubmit="handleProfileUpdate(event)">
         <div style="text-align:center;margin-bottom:16px;">
-          <img id="edit-avatar-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=runner" style="width:72px;height:72px;border-radius:50%;border:2px solid #10b981;object-fit:cover;background:#1f2937;margin-bottom:8px;">
-          <div>
-            <button type="button" class="btn btn-secondary" onclick="generateNewRandomAvatar()" style="font-size:11px;padding:5px 10px;margin:0 auto;">🎲 랜덤 아바타 변경</button>
+          <img id="edit-avatar-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=runner" style="width:76px;height:76px;border-radius:50%;border:2px solid #10b981;object-fit:cover;background:#1f2937;margin-bottom:10px;">
+          <div style="display:flex;gap:6px;justify-content:center;">
+            <button type="button" class="btn btn-primary" onclick="triggerProfilePhotoUpload()" style="font-size:11px;padding:6px 12px;flex:none;">📷 내 사진 업로드</button>
+            <button type="button" class="btn btn-secondary" onclick="generateNewRandomAvatar()" style="font-size:11px;padding:6px 12px;flex:none;">🎲 랜덤 로봇</button>
           </div>
+          <input type="file" id="profile-photo-input" accept="image/*" style="display:none;" onchange="handleProfilePhotoSelected(this)">
         </div>
         <div class="form-group">
           <label class="form-label">닉네임 *</label>
@@ -645,6 +1239,84 @@
           <button type="submit" class="btn btn-primary">프로필 저장</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 프로필 사진 원형 영역 크롭 & 초압축 모달 -->
+  <div id="crop-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:400px;text-align:center;padding:20px;">
+      <div class="modal-header" style="margin-bottom:12px;">
+        <div class="modal-title">프로필 사진 영역 맞추기</div>
+        <button class="close-btn" onclick="closeCropModal()">✕</button>
+      </div>
+      <div class="cropper-container-box">
+        <img id="crop-image-target" src="" style="max-width:100%;display:block;">
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:14px;">원하는 영역을 드래그하거나 확대/축소하여 원 안에 맞춰주세요.</div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="closeCropModal()">취소</button>
+        <button type="button" class="btn btn-primary" onclick="applyCroppedProfilePhoto()">원형 사진 적용</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 타 러너 프로필 및 개인 기록실 방문 모달 (신설) -->
+  <div id="runner-archive-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeRunnerArchiveModal()">
+    <div class="modal-box" style="max-width:540px;max-height:88vh;padding:18px;">
+      <div class="modal-header" style="margin-bottom:14px;">
+        <div class="modal-title" style="display:flex;align-items:center;gap:6px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span id="other-runner-name-title">러너 기록실</span>
+        </div>
+        <button class="close-btn" onclick="closeRunnerArchiveModal()">✕</button>
+      </div>
+
+      <!-- 러너 헤더 -->
+      <div class="user-profile-bar" style="margin-bottom:14px;background:#090e18;">
+        <div class="user-profile-info">
+          <img id="other-runner-avatar" class="user-avatar" src="" alt="아바타">
+          <div style="min-width:0;flex:1;">
+            <div style="font-size:15px;font-weight:800;color:#ffffff;" id="other-runner-nickname">러너</div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px;word-break:keep-all;" id="other-runner-bio">달리기를 사랑하는 러너</div>
+          </div>
+        </div>
+        <div id="other-runner-follow-wrap" style="flex-shrink:0;"></div>
+      </div>
+
+      <!-- 러너 3대 종목 PB 쇼케이스 -->
+      <div class="section-title" style="font-size:11px;margin-bottom:8px;">종목별 최고 기록 (PB)</div>
+      <div class="pb-grid" style="margin-bottom:16px;">
+        <div class="pb-card" style="padding:10px;">
+          <div class="pb-header">
+            <span style="font-size:10px;font-weight:800;color:#38bdf8;">10KM PB</span>
+            <span class="pb-badge">BEST</span>
+          </div>
+          <div class="pb-time" style="font-size:18px;" id="other-pb-10k-time">--:--:--</div>
+          <div class="pb-pace" style="font-size:10px;" id="other-pb-10k-pace">기록 없음</div>
+        </div>
+        <div class="pb-card" style="padding:10px;">
+          <div class="pb-header">
+            <span style="font-size:10px;font-weight:800;color:#818cf8;">HALF PB</span>
+            <span class="pb-badge" style="background:rgba(99,102,241,0.15);color:#a5b4fc;">BEST</span>
+          </div>
+          <div class="pb-time" style="font-size:18px;" id="other-pb-half-time">--:--:--</div>
+          <div class="pb-pace" style="font-size:10px;" id="other-pb-half-pace">기록 없음</div>
+        </div>
+        <div class="pb-card" style="padding:10px;">
+          <div class="pb-header">
+            <span style="font-size:10px;font-weight:800;color:#34d399;">FULL PB</span>
+            <span class="pb-badge" style="background:rgba(16,185,129,0.15);color:#34d399;">BEST</span>
+          </div>
+          <div class="pb-time" style="font-size:18px;" id="other-pb-full-time">--:--:--</div>
+          <div class="pb-pace" style="font-size:10px;" id="other-pb-full-pace">기록 없음</div>
+        </div>
+      </div>
+
+      <!-- 러너 완주 기록 히스토리 -->
+      <div class="section-title" style="font-size:11px;margin-bottom:8px;">완주 기록 히스토리</div>
+      <div id="other-runner-records-list">
+        <div style="text-align:center;padding:30px 0;color:#6b7280;font-size:12px;">기록을 불러오는 중...</div>
+      </div>
     </div>
   </div>
 
@@ -664,6 +1336,23 @@
   </div>
 
   <script>
+    // ========================================================
+    // 보안 헬퍼: 사용자 입력은 화면에 넣기 전에 반드시 이스케이프
+    //   esc(v)     → HTML 본문/속성용
+    //   jsArg(v)   → onclick="fn(${jsArg(v)})" 처럼 인라인 핸들러 인자용 (따옴표 포함)
+    //   safeUrl(u) → http(s)/data:image/blob 주소만 허용 (javascript: 차단)
+    // ========================================================
+    function esc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"'`]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c]));
+    }
+    function jsArg(v) { return esc(JSON.stringify(String(v == null ? '' : v))); }
+    function isSafeUrl(u) { return /^(https?:\/\/|data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,|blob:)/i.test(String(u || '')); }
+    function safeUrl(u, fallback) { return esc(isSafeUrl(u) ? u : (fallback || '')); }
+    function avatarOf(p, id) { return safeUrl(p && p.avatar_url, `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(id || 'runner')}`); }
+    function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+    function fmtTime(r) { return `${String(num(r.hours)).padStart(2, '0')}:${String(num(r.minutes)).padStart(2, '0')}:${String(num(r.seconds)).padStart(2, '0')}`; }
+    function tagClassOf(cat) { return cat === 'Full' ? 'tag-full' : (cat === 'Half' ? 'tag-half' : 'tag-10k'); }
+
     // Supabase Cloud Configuration
     const SUPABASE_URL = "https://ybidlchhjolacxxafwzd.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_HAqWyNU9mF10VXNT0ngsRQ_ZyAPxhR_";
@@ -715,7 +1404,7 @@
       });
     }
 
-    // Helper: DataURL to Blob for Supabase Storage Upload
+    // Helper: DataURL to Blob
     function dataURLtoBlob(dataurl) {
       const arr = dataurl.split(',');
       const mime = arr[0].match(/:(.*?);/)[1];
@@ -740,7 +1429,6 @@
 
         if (error) {
           console.warn("Supabase storage upload error:", error);
-          // If storage bucket blocked by RLS, don't crash - return null for image URL so DB upsert still works!
           return null;
         }
 
@@ -755,18 +1443,71 @@
       }
     }
 
+    // Upload Compressed Avatar to Supabase Storage 'avatars' or profiles
+    async function uploadAvatarToSupabase(userId, dataUrl) {
+      if (!supabaseClient || !dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
+      try {
+        const blob = dataURLtoBlob(dataUrl);
+        const fileName = `avatar_${userId}_${Date.now()}.webp`;
+        const { data, error } = await supabaseClient.storage
+          .from('avatars')
+          .upload(fileName, blob, { contentType: 'image/webp', upsert: true });
+
+        if (error) {
+          // If avatars bucket not created, return dataUrl directly (approx 25KB, safe in DB)
+          return dataUrl;
+        }
+
+        const { data: pubData } = supabaseClient.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+        return pubData ? pubData.publicUrl : dataUrl;
+      } catch (err) {
+        console.warn("Avatar upload fallback to dataURL:", err);
+        return dataUrl;
+      }
+    }
+
+    // Compress any image using canvas (maxWidth, quality)
+    function compressImageFile(file, maxWidth = 1200, quality = 0.82) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (w > maxWidth) {
+              h = Math.round((h * maxWidth) / w);
+              w = maxWidth;
+            }
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
     let records = [];
     let currentEditingId = null;
     let tempCertDataUrl = null;
     let activeCategory = "Full";
 
-    // App Initialization: Fetch from Supabase Cloud DB with Local Fallback
-    
     // User & Profile State
     let currentUser = null;
     let currentProfile = null;
-    let authMode = "login"; // "login" or "signup"
+    let authMode = "login";
     let tempAvatarUrl = "";
+    let cropperInstance = null;
 
     async function initAuthListener() {
       if (!supabaseClient) return;
@@ -810,7 +1551,6 @@
         if (!error && data) {
           currentProfile = data;
         } else {
-          // If no profile yet, create a default one
           const defNickname = currentUser.email ? currentUser.email.split('@')[0] : "러너";
           const defAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${userId}`;
           const { data: inserted } = await supabaseClient
@@ -830,23 +1570,20 @@
       const profileDisplay = document.getElementById("user-profile-display");
       const guestDisplay = document.getElementById("guest-display");
       const authMainBtn = document.getElementById("auth-main-btn");
-      const appHeading = document.getElementById("app-heading-title");
 
       if (currentUser && currentProfile) {
         profileDisplay.style.display = "flex";
         guestDisplay.style.display = "none";
         document.getElementById("user-nickname-text").textContent = currentProfile.nickname || "러너";
         document.getElementById("user-bio-text").textContent = currentProfile.bio || "달리는 중 🏃‍♂️";
-        document.getElementById("user-avatar-img").src = currentProfile.avatar_url || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.id}`;
+        document.getElementById("user-avatar-img").src = isSafeUrl(currentProfile.avatar_url) ? currentProfile.avatar_url : `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUser.id)}`;
         authMainBtn.textContent = "로그아웃";
         authMainBtn.className = "btn btn-secondary";
-        if (appHeading) appHeading.textContent = `${currentProfile.nickname} 러너의 마라톤 아카이브`;
       } else {
         profileDisplay.style.display = "none";
         guestDisplay.style.display = "flex";
         authMainBtn.textContent = "로그인 / 가입";
         authMainBtn.className = "btn btn-primary";
-        if (appHeading) appHeading.textContent = "나의 마라톤 완주 기록 아카이브";
       }
     }
 
@@ -913,7 +1650,6 @@
           if (error) throw error;
           closeAuthModal();
         } else {
-          // Sign Up
           const { data, error } = await supabaseClient.auth.signUp({
             email,
             password,
@@ -921,9 +1657,7 @@
           });
           if (error) throw error;
 
-          // Check if session created immediately (when email confirmation is off)
           if (data.user) {
-            // Update profile with user-chosen nickname
             await supabaseClient.from('profiles').upsert({
               id: data.user.id,
               email: email,
@@ -943,6 +1677,7 @@
       }
     }
 
+    // Profile Edit Modal with Photo Upload & Cropper
     function openProfileModal() {
       if (!currentProfile) return;
       tempAvatarUrl = currentProfile.avatar_url;
@@ -961,6 +1696,67 @@
       document.getElementById("edit-avatar-preview").src = tempAvatarUrl;
     }
 
+    function triggerProfilePhotoUpload() {
+      document.getElementById("profile-photo-input").click();
+    }
+
+    function handleProfilePhotoSelected(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        openCropModal(e.target.result);
+      };
+      reader.readAsDataURL(file);
+      input.value = "";
+    }
+
+    function openCropModal(imgSrc) {
+      const cropModal = document.getElementById("crop-modal");
+      const cropImg = document.getElementById("crop-image-target");
+      cropImg.src = imgSrc;
+      cropModal.style.display = "flex";
+
+      if (cropperInstance) cropperInstance.destroy();
+      cropperInstance = new Cropper(cropImg, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 0.9,
+        restore: false,
+        guides: false,
+        center: false,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
+    }
+
+    function closeCropModal() {
+      if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
+      }
+      document.getElementById("crop-modal").style.display = "none";
+    }
+
+    // Crop to 256x256 WebP (Around 25-35KB) for ultra-compact storage
+    function applyCroppedProfilePhoto() {
+      if (!cropperInstance) return;
+      const croppedCanvas = cropperInstance.getCroppedCanvas({
+        width: 256,
+        height: 256,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high'
+      });
+
+      tempAvatarUrl = croppedCanvas.toDataURL('image/webp', 0.82);
+      document.getElementById("edit-avatar-preview").src = tempAvatarUrl;
+      closeCropModal();
+    }
+
     async function handleProfileUpdate(e) {
       e.preventDefault();
       if (!currentUser || !supabaseClient) return;
@@ -968,12 +1764,17 @@
       const newNick = document.getElementById("profile-name-input").value.trim();
       const newBio = document.getElementById("profile-bio-input").value.trim();
 
+      let finalAvatarUrl = tempAvatarUrl;
+      if (tempAvatarUrl && tempAvatarUrl.startsWith("data:")) {
+        finalAvatarUrl = await uploadAvatarToSupabase(currentUser.id, tempAvatarUrl);
+      }
+
       const { data, error } = await supabaseClient
         .from('profiles')
         .update({
           nickname: newNick,
           bio: newBio,
-          avatar_url: tempAvatarUrl
+          avatar_url: finalAvatarUrl
         })
         .eq('id', currentUser.id)
         .select()
@@ -987,30 +1788,54 @@
       currentProfile = data;
       updateAuthUI();
       closeProfileModal();
-      alert("프로필이 업데이트되었습니다.");
+      alert("프로필이 성공적으로 업데이트되었습니다.");
     }
 
-    
-    // Navigation & Feed / Social State
+    // Navigation (4 Main Tabs)
     let currentMainView = 'archive';
     let currentFeedFilter = 'all'; // 'all' or 'following'
+    let currentRankScope = 'all';  // 'all' or 'following'
+    let currentRankCategory = 'Full'; // 'Full', 'Half', '10K'
     let followingIds = new Set();
     let communityProfiles = new Map();
     let feedRecords = [];
-    let clappedRecordIds = new Set(JSON.parse(localStorage.getItem("clapped_records") || "[]"));
+    // 박수: Supabase claps 테이블에 저장해 모든 러너가 같은 숫자를 본다
+    let clapCounts = new Map();      // record_id → 박수 수
+    let myClaps = new Set();         // 내가 박수 친 record_id
+    let clapsAvailable = true;       // claps 테이블이 아직 없으면 false
+
+    async function loadClaps(recordIds) {
+      clapCounts = new Map(); myClaps = new Set();
+      if (!supabaseClient || !recordIds.length) return;
+      try {
+        const { data, error } = await supabaseClient.from('claps').select('record_id, user_id').in('record_id', recordIds);
+        if (error) { clapsAvailable = false; console.warn("claps 테이블 조회 실패 (SQL 실행 필요):", error.message); return; }
+        clapsAvailable = true;
+        (data || []).forEach(c => {
+          clapCounts.set(c.record_id, (clapCounts.get(c.record_id) || 0) + 1);
+          if (currentUser && c.user_id === currentUser.id) myClaps.add(c.record_id);
+        });
+      } catch (err) {
+        clapsAvailable = false;
+      }
+    }
 
     function switchMainView(view) {
       currentMainView = view;
       document.getElementById("tab-btn-archive").classList.toggle("active", view === 'archive');
       document.getElementById("tab-btn-feed").classList.toggle("active", view === 'feed');
+      document.getElementById("tab-btn-ranking").classList.toggle("active", view === 'ranking');
       document.getElementById("tab-btn-runners").classList.toggle("active", view === 'runners');
 
       document.getElementById("view-archive").style.display = view === 'archive' ? 'block' : 'none';
       document.getElementById("view-feed").style.display = view === 'feed' ? 'block' : 'none';
+      document.getElementById("view-ranking").style.display = view === 'ranking' ? 'block' : 'none';
       document.getElementById("view-runners").style.display = view === 'runners' ? 'block' : 'none';
 
       if (view === 'feed') {
         loadFeed();
+      } else if (view === 'ranking') {
+        loadRankingLeaderboard();
       } else if (view === 'runners') {
         loadRunnersDirectory();
       }
@@ -1023,7 +1848,7 @@
       renderFeedUI();
     }
 
-    // Follow / Social Database operations
+    // Follow Database operations
     async function fetchFollowingList() {
       if (!currentUser || !supabaseClient) {
         followingIds = new Set();
@@ -1086,9 +1911,9 @@
 
       if (btnEl) btnEl.disabled = false;
       renderRunnersList();
-      if (currentMainView === 'feed') {
-        renderFeedUI();
-      }
+      if (currentMainView === 'feed') renderFeedUI();
+      if (currentMainView === 'ranking') renderRankingUI();
+      updateOtherRunnerFollowBtn(targetUserId);
     }
 
     // Load Newsfeed
@@ -1104,19 +1929,17 @@
       }
 
       try {
-        // 1. Fetch public marathon records (all runners)
         const { data: rawRecs, error: recError } = await supabaseClient
           .from('marathon_records')
           .select('*')
           .order('date', { ascending: false })
-          .limit(50);
+          .limit(60);
 
         if (recError || !rawRecs) {
           feedListEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">피드 기록을 가져오지 못했습니다.</div>';
           return;
         }
 
-        // 2. Fetch profiles for all distinct user_ids
         const uids = [...new Set(rawRecs.map(r => r.user_id).filter(Boolean))];
         if (uids.length > 0) {
           const { data: profs } = await supabaseClient
@@ -1130,6 +1953,7 @@
         }
 
         feedRecords = rawRecs;
+        await loadClaps(rawRecs.map(r => r.id));
         renderFeedUI();
       } catch (err) {
         console.error("Load feed error:", err);
@@ -1167,82 +1991,69 @@
       feedListEl.innerHTML = filtered.map(r => {
         const author = communityProfiles.get(r.user_id) || {
           nickname: r.user_id ? "러너" : "익명 러너",
-          avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${r.user_id || 'anonymous'}`,
           bio: "완주를 향해 달리는 러너"
         };
         const isFollowed = r.user_id ? followingIds.has(r.user_id) : false;
         const isSelf = currentUser && r.user_id === currentUser.id;
-        const isClapped = clappedRecordIds.has(r.id);
-        
-        // 실제 박수 누적 갯수 (기본 0개부터 시작)
-        const totalClap = isClapped ? 1 : 0;
-
-        const tStr = `${String(r.hours).padStart(2,'0')}:${String(r.minutes).padStart(2,'0')}:${String(r.seconds).padStart(2,'0')}`;
-        const tagClass = r.category === 'Full' ? 'tag-full' : (r.category === 'Half' ? 'tag-half' : 'tag-10k');
-        const hasCert = Boolean(r.cert_image_url);
+        const isClapped = myClaps.has(r.id);
+        const totalClap = clapCounts.get(r.id) || 0;
+        const hasCert = isSafeUrl(r.cert_image_url);
+        const nick = esc(author.nickname || '러너');
 
         return `
           <div class="feed-card">
-            <!-- 상단 헤더: 작성자 프로필 & 팔로우 버튼 -->
             <div class="feed-author-bar">
-              <div class="feed-author-info">
-                <img class="feed-avatar" src="${author.avatar_url}" alt="아바타">
-                <div>
-                  <div class="feed-author-name">${author.nickname} ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : ''}</div>
-                  <div class="feed-date-line">${r.date || ''} • ${author.bio || '러너'}</div>
+              <div class="feed-author-info" onclick="openRunnerArchiveModal(${jsArg(r.user_id)})" title="이 러너의 기록실 구경하기">
+                <img class="feed-avatar" src="${avatarOf(author, r.user_id)}" alt="아바타">
+                <div style="min-width:0;flex:1;">
+                  <div class="feed-author-name">
+                    ${nick}
+                    ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : '<span style="font-size:10px;color:#38bdf8;">🔍 기록실 보기</span>'}
+                  </div>
+                  <div class="feed-date-line">${esc(r.date || '')} • ${esc(author.bio || '러너')}</div>
                 </div>
               </div>
               <div style="flex-shrink:0;">
                 ${(!isSelf && r.user_id) ? `
-                  <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow('${r.user_id}', this)">
+                  <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow(${jsArg(r.user_id)}, this)">
                     ${isFollowed ? '팔로잉 ✓' : '+ 팔로우'}
                   </button>
                 ` : ''}
               </div>
             </div>
 
-            <!-- 중앙 메인 바디: 좌측(대회명, 타이머+종목, 페이스/배번) + 우측(세로 기록증) -->
             <div class="feed-main-body ${hasCert ? '' : 'no-cert'}">
               <div class="feed-left-col">
                 <div>
-                  <!-- 대회명: 모바일에서도 줄바꿈 허용하여 잘림 방지 -->
-                  <div class="feed-race-name-full">${r.name}</div>
-                  
-                  <!-- 타이머 + 오른쪽 종목 배지 인라인 결합 -->
+                  <div class="feed-race-name-full">${esc(r.name)}</div>
                   <div class="feed-time-badge-row">
-                    <div class="feed-hud-timer">${tStr}</div>
-                    <span class="tag ${tagClass} feed-hud-badge">${r.category} (${r.distance_km}km)</span>
+                    <div class="feed-hud-timer">${fmtTime(r)}</div>
+                    <span class="tag ${tagClassOf(r.category)} feed-hud-badge">${esc(r.category)} (${num(r.distance_km)}km)</span>
                   </div>
                 </div>
 
-                <!-- 메트릭 칩스 (페이스 & 배번만 간결하게) -->
                 <div class="feed-hud-chips">
-                  <div class="feed-hud-chip">평균 페이스 <b>${r.pace}</b></div>
-                  ${r.bib ? `<div class="feed-hud-chip">배번 <b>#${r.bib}</b></div>` : ''}
+                  <div class="feed-hud-chip">평균 페이스 <b>${calculatePace(r.hours, r.minutes, r.seconds, r.distance_km)}</b></div>
+                  ${r.bib ? `<div class="feed-hud-chip">배번 <b>#${esc(r.bib)}</b></div>` : ''}
                 </div>
               </div>
 
-              <!-- 우측 세로형 실물 기록증 포스터 프리뷰 -->
               ${hasCert ? `
-                <div class="feed-cert-poster" onclick="openCertDirectViewer('${r.cert_image_url}', '${r.name}')" title="클릭 시 기록증 원본 확대">
-                  <img src="${r.cert_image_url}" alt="완주기록증">
+                <div class="feed-cert-poster" onclick="openCertDirectViewer(${jsArg(r.cert_image_url)}, ${jsArg(r.name)})" title="클릭 시 기록증 원본 확대">
+                  <img src="${safeUrl(r.cert_image_url)}" alt="완주기록증">
                   <div class="feed-cert-poster-tag">🔍 원본</div>
                 </div>
               ` : ''}
             </div>
 
-            <!-- 확장된 대회 후기 / 소감 박스 -->
-            ${r.notes ? `
-              <div class="feed-notes-box">💬 ${r.notes}</div>
-            ` : ''}
+            ${r.notes ? `<div class="feed-notes-box">💬 ${esc(r.notes)}</div>` : ''}
 
-            <!-- 하단 인터랙션 바: 간결해진 박수 버튼(아이콘 + 숫자) -->
             <div class="feed-interact-bar">
-              <button class="clap-btn-mini ${isClapped ? 'clapped' : ''}" onclick="toggleClap('${r.id}', this)" title="완주 축하하기">
-                👏 <span class="clap-count" id="clap-count-${r.id}">${totalClap}</span>
+              <button class="clap-btn-mini ${isClapped ? 'clapped' : ''}" onclick="toggleClap(${jsArg(r.id)}, this)" title="완주 축하하기">
+                👏 <span class="clap-count">${totalClap}</span>
               </button>
               <div style="font-size:11px;color:#64748b;">
-                ${author.nickname} 러너의 완주를 축하해주세요!
+                ${nick} 러너의 완주를 축하해주세요!
               </div>
             </div>
           </div>
@@ -1250,24 +2061,51 @@
       }).join('');
     }
 
-    function toggleClap(recId, btn) {
-      const isClapped = clappedRecordIds.has(recId);
-      if (isClapped) {
-        clappedRecordIds.delete(recId);
-      } else {
-        clappedRecordIds.add(recId);
+    async function toggleClap(recId, btn) {
+      if (!currentUser) {
+        alert("박수를 보내려면 먼저 로그인해주세요!");
+        openAuthModal('login');
+        return;
       }
-      localStorage.setItem("clapped_records", JSON.stringify([...clappedRecordIds]));
-      
-      const newClapped = !isClapped;
-      btn.classList.toggle("clapped", newClapped);
-      const cntEl = document.getElementById(`clap-count-${recId}`);
-      if (cntEl) {
-        cntEl.textContent = newClapped ? 1 : 0;
+      if (!clapsAvailable) {
+        alert("박수 기능을 쓰려면 Supabase에 claps 테이블을 먼저 만들어야 합니다. (함께 드린 SQL 실행)");
+        return;
       }
+      const wasClapped = myClaps.has(recId);
+      const cntEl = btn.querySelector('.clap-count');
+      const setUI = (clapped, count) => {
+        btn.classList.toggle("clapped", clapped);
+        if (cntEl) cntEl.textContent = count;
+      };
+      // 화면 먼저 바꾸고(낙관적 업데이트) 실패하면 되돌린다
+      const before = clapCounts.get(recId) || 0;
+      const after = Math.max(0, before + (wasClapped ? -1 : 1));
+      if (wasClapped) myClaps.delete(recId); else myClaps.add(recId);
+      clapCounts.set(recId, after);
+      setUI(!wasClapped, after);
+      btn.disabled = true;
+
+      let error = null;
+      try {
+        if (wasClapped) {
+          ({ error } = await supabaseClient.from('claps').delete().eq('record_id', recId).eq('user_id', currentUser.id));
+        } else {
+          ({ error } = await supabaseClient.from('claps').insert({ record_id: recId, user_id: currentUser.id }));
+          if (error && error.code === '23505') error = null;   // 이미 눌러둔 상태(중복) → 성공으로 간주
+        }
+      } catch (err) { error = err; }
+
+      if (error) {
+        if (wasClapped) myClaps.add(recId); else myClaps.delete(recId);
+        clapCounts.set(recId, before);
+        setUI(wasClapped, before);
+        console.warn("clap error:", error);
+      }
+      btn.disabled = false;
     }
 
     function openCertDirectViewer(url, title) {
+      if (!isSafeUrl(url)) return;
       document.getElementById("cert-view-title").textContent = `${title} 완주 기록증`;
       document.getElementById("cert-view-img").src = url;
       const dlLink = document.getElementById("cert-download-link");
@@ -1276,6 +2114,270 @@
       document.getElementById("cert-viewer-modal").style.display = "flex";
     }
 
+    // ========================================================
+    // 3. 종목별 랭킹 전광판 (리더보드 로직)
+    // ========================================================
+    let allRankingRecords = [];
+
+    function setRankingScope(scope) {
+      currentRankScope = scope;
+      document.getElementById("rank-scope-all").classList.toggle("active", scope === 'all');
+      document.getElementById("rank-scope-following").classList.toggle("active", scope === 'following');
+      renderRankingUI();
+    }
+
+    function setRankingCategory(cat) {
+      currentRankCategory = cat;
+      document.getElementById("rank-cat-Full").classList.toggle("active", cat === 'Full');
+      document.getElementById("rank-cat-Half").classList.toggle("active", cat === 'Half');
+      document.getElementById("rank-cat-10K").classList.toggle("active", cat === '10K');
+      renderRankingUI();
+    }
+
+    async function loadRankingLeaderboard() {
+      const container = document.getElementById("ranking-list-container");
+      container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">랭킹을 산출하는 중...</div>';
+
+      await fetchFollowingList();
+
+      if (!supabaseClient) {
+        container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">클라우드에 연결할 수 없습니다.</div>';
+        return;
+      }
+
+      try {
+        const { data: recs, error } = await supabaseClient
+          .from('marathon_records')
+          .select('*')
+          .not('user_id', 'is', null);
+
+        if (error || !recs) {
+          container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#6b7280;font-size:13px;">기록을 가져오지 못했습니다.</div>';
+          return;
+        }
+
+        const uids = [...new Set(recs.map(r => r.user_id))];
+        if (uids.length > 0) {
+          const { data: profs } = await supabaseClient
+            .from('profiles')
+            .select('id, nickname, avatar_url, bio')
+            .in('id', uids);
+
+          if (profs) {
+            profs.forEach(p => communityProfiles.set(p.id, p));
+          }
+        }
+
+        allRankingRecords = recs;
+        renderRankingUI();
+      } catch (err) {
+        console.error("Load ranking error:", err);
+      }
+    }
+
+    function renderRankingUI() {
+      const container = document.getElementById("ranking-list-container");
+      
+      let targetRecs = allRankingRecords;
+      if (currentRankScope === 'following') {
+        if (!currentUser) {
+          container.innerHTML = `
+            <div style="text-align:center;padding:40px 20px;background:#111827;border-radius:18px;border:1px solid #1f2937;">
+              <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:6px;">로그인이 필요합니다</div>
+              <div style="font-size:12px;color:#9ca3af;margin-bottom:14px;">팔로우한 러너들의 랭킹을 보려면 로그인해주세요.</div>
+              <button class="btn btn-primary" onclick="openAuthModal('login')" style="margin:0 auto;display:inline-flex;">로그인하기</button>
+            </div>`;
+          return;
+        }
+        targetRecs = allRankingRecords.filter(r => followingIds.has(r.user_id) || r.user_id === currentUser.id);
+      }
+
+      // Filter by category and find best PB per user
+      const userBestMap = new Map();
+      targetRecs.forEach(r => {
+        let isMatch = false;
+        if (currentRankCategory === 'Full' && (r.category === 'Full' || r.distance_km >= 42.0)) isMatch = true;
+        else if (currentRankCategory === 'Half' && (r.category === 'Half' || (r.distance_km >= 21.0 && r.distance_km < 22.0))) isMatch = true;
+        else if (currentRankCategory === '10K' && (r.category === '10K' || (r.distance_km >= 9.8 && r.distance_km <= 10.5))) isMatch = true;
+
+        if (isMatch) {
+          const sec = r.hours * 3600 + r.minutes * 60 + r.seconds;
+          if (sec > 0) {
+            if (!userBestMap.has(r.user_id) || sec < userBestMap.get(r.user_id).sec) {
+              userBestMap.set(r.user_id, { rec: r, sec: sec });
+            }
+          }
+        }
+      });
+
+      const sortedRanking = Array.from(userBestMap.values())
+        .sort((a, b) => a.sec - b.sec)
+        .slice(0, 10); // TOP 10
+
+      if (sortedRanking.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;background:#111827;border-radius:18px;border:1px solid #1f2937;">
+            <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;">해당 종목의 완주 기록이 없습니다</div>
+            <div style="font-size:11px;color:#9ca3af;">첫 완주 기록을 등록하고 1위에 올라보세요!</div>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = sortedRanking.map((item, index) => {
+        const rank = index + 1;
+        const r = item.rec;
+        const author = communityProfiles.get(r.user_id) || { nickname: "러너" };
+        const isSelf = currentUser && r.user_id === currentUser.id;
+        const paceStr = calculatePace(r.hours, r.minutes, r.seconds, r.distance_km);
+
+        let medalClass = 'mdefault';
+        let itemClass = '';
+        if (rank === 1) { medalClass = 'm1'; itemClass = 'top1'; }
+        else if (rank === 2) { medalClass = 'm2'; itemClass = 'top2'; }
+        else if (rank === 3) { medalClass = 'm3'; itemClass = 'top3'; }
+
+        return `
+          <div class="rank-item ${itemClass}" onclick="openRunnerArchiveModal(${jsArg(r.user_id)})" title="이 러너의 기록실 구경하기">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
+              <div class="rank-medal-badge ${medalClass}">${rank}</div>
+              <img class="feed-avatar" src="${avatarOf(author, r.user_id)}" alt="아바타">
+              <div style="min-width:0;flex:1;">
+                <div style="font-size:14px;font-weight:800;color:#fff;display:flex;align-items:center;gap:4px;">
+                  ${esc(author.nickname || '러너')}
+                  ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : ''}
+                </div>
+                <div style="font-size:11px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.name)} (${esc(r.date)})</div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:17px;font-weight:900;color:#38bdf8;font-family:monospace;">${fmtTime(r)}</div>
+              <div style="font-size:11px;color:#10b981;font-weight:700;">${paceStr}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ========================================================
+    // 4. 타 러너 개인 기록실 & PB 쇼케이스 팝업 뷰어
+    // ========================================================
+    async function openRunnerArchiveModal(targetUserId) {
+      if (!targetUserId) return;
+      const modal = document.getElementById("runner-archive-modal");
+      modal.style.display = "flex";
+
+      const author = communityProfiles.get(targetUserId) || {
+        nickname: "러너",
+        bio: "완주를 향해 달리는 러너"
+      };
+
+      document.getElementById("other-runner-name-title").textContent = `${author.nickname} 러너의 기록실`;
+      document.getElementById("other-runner-nickname").textContent = author.nickname;
+      document.getElementById("other-runner-bio").textContent = author.bio || "달리는 중 🏃‍♂️";
+      document.getElementById("other-runner-avatar").src = isSafeUrl(author.avatar_url) ? author.avatar_url : `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(targetUserId)}`;
+
+      updateOtherRunnerFollowBtn(targetUserId);
+
+      // Load records for targetUserId
+      const listContainer = document.getElementById("other-runner-records-list");
+      listContainer.innerHTML = '<div style="text-align:center;padding:30px 0;color:#6b7280;font-size:12px;">기록을 불러오는 중...</div>';
+
+      try {
+        const { data: userRecs, error } = await supabaseClient
+          .from('marathon_records')
+          .select('*')
+          .eq('user_id', targetUserId)
+          .order('date', { ascending: false });
+
+        if (error || !userRecs || userRecs.length === 0) {
+          listContainer.innerHTML = '<div style="text-align:center;padding:24px 0;color:#6b7280;font-size:12px;">등록된 완주 기록이 없습니다.</div>';
+          renderOtherRunnerPBs([]);
+          return;
+        }
+
+        renderOtherRunnerPBs(userRecs);
+
+        listContainer.innerHTML = userRecs.map(r => {
+          const paceStr = calculatePace(r.hours, r.minutes, r.seconds, r.distance_km);
+          const hasCert = isSafeUrl(r.cert_image_url);
+          return `
+            <div class="rec-item" style="padding:12px;margin-bottom:8px;">
+              <div class="rec-top">
+                <span class="tag ${tagClassOf(r.category)}">${esc(r.category)} (${num(r.distance_km)}km)</span>
+                <span class="rec-date">${esc(r.date)} ${r.bib ? '• BIB ' + esc(r.bib) : ''}</span>
+              </div>
+              <div class="rec-name" style="font-size:14px;margin-bottom:6px;">${esc(r.name)}</div>
+              <div class="rec-info-bar" style="padding-top:6px;">
+                <div>
+                  <div style="font-size:18px;font-weight:900;color:#fff;font-family:monospace;">${fmtTime(r)}</div>
+                  <div style="font-size:11px;color:#9ca3af;">평균 페이스 ${paceStr}</div>
+                </div>
+                ${hasCert ? `
+                  <button class="icon-btn cert" title="기록증 원본" onclick="openCertDirectViewer(${jsArg(r.cert_image_url)}, ${jsArg(r.name)})">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+                  </button>
+                ` : ''}
+              </div>
+              ${r.notes ? `<div style="font-size:11px;color:#94a3b8;margin-top:6px;padding-top:6px;border-top:1px dashed #1e293b;">💬 ${esc(r.notes)}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error("Open other runner archive error:", err);
+      }
+    }
+
+    function renderOtherRunnerPBs(userRecs) {
+      let fBest = null, hBest = null, tBest = null;
+
+      userRecs.forEach(r => {
+        const sec = r.hours * 3600 + r.minutes * 60 + r.seconds;
+        if (sec <= 0) return;
+
+        if (r.category === "Full" || r.distance_km >= 42.0) {
+          if (!fBest || sec < fBest.sec) fBest = { r, sec };
+        } else if (r.category === "Half" || (r.distance_km >= 21.0 && r.distance_km < 22.0)) {
+          if (!hBest || sec < hBest.sec) hBest = { r, sec };
+        } else if (r.category === "10K" || (r.distance_km >= 9.8 && r.distance_km <= 10.5)) {
+          if (!tBest || sec < tBest.sec) tBest = { r, sec };
+        }
+      });
+
+      const setPbView = (prefix, bestObj) => {
+        const timeEl = document.getElementById(`other-${prefix}-time`);
+        const paceEl = document.getElementById(`other-${prefix}-pace`);
+        if (!bestObj) {
+          timeEl.textContent = "--:--:--";
+          paceEl.textContent = "기록 없음";
+        } else {
+          const br = bestObj.r;
+          timeEl.textContent = `${String(br.hours).padStart(2,'0')}:${String(br.minutes).padStart(2,'0')}:${String(br.seconds).padStart(2,'0')}`;
+          paceEl.textContent = `${calculatePace(br.hours, br.minutes, br.seconds, br.distance_km)} (${br.date})`;
+        }
+      };
+
+      setPbView('pb-10k', tBest);
+      setPbView('pb-half', hBest);
+      setPbView('pb-full', fBest);
+    }
+
+    function updateOtherRunnerFollowBtn(targetUserId) {
+      const wrap = document.getElementById("other-runner-follow-wrap");
+      if (!currentUser || targetUserId === currentUser.id) {
+        wrap.innerHTML = '';
+        return;
+      }
+      const isFollowed = followingIds.has(targetUserId);
+      wrap.innerHTML = `
+        <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow(${jsArg(targetUserId)}, this)">
+          ${isFollowed ? '팔로잉 ✓' : '+ 팔로우'}
+        </button>
+      `;
+    }
+
+    function closeRunnerArchiveModal() {
+      document.getElementById("runner-archive-modal").style.display = "none";
+    }
 
     // Runner Directory
     let allDirectoryRunners = [];
@@ -1330,19 +2432,19 @@
 
         return `
           <div class="runner-item">
-            <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
-              <img class="feed-avatar" src="${r.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + r.id}" alt="아바타">
+            <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;cursor:pointer;" onclick="openRunnerArchiveModal(${jsArg(r.id)})" title="이 러너의 기록실 구경하기">
+              <img class="feed-avatar" src="${avatarOf(r, r.id)}" alt="아바타">
               <div style="min-width:0;flex:1;">
                 <div style="font-size:14px;font-weight:800;color:#ffffff;display:flex;align-items:center;gap:6px;">
-                  ${r.nickname || '러너'}
+                  ${esc(r.nickname || '러너')}
                   ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : ''}
                 </div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:2px;word-break:keep-all;line-height:1.3;">${r.bio || '달리기를 사랑하는 러너'}</div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px;word-break:keep-all;line-height:1.3;">${esc(r.bio || '달리기를 사랑하는 러너')}</div>
               </div>
             </div>
             <div style="flex-shrink:0;">
               ${!isSelf ? `
-                <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow('${r.id}', this)">
+                <button class="btn-follow ${isFollowed ? 'following' : 'follow'}" onclick="toggleFollow(${jsArg(r.id)}, this)">
                   ${isFollowed ? '팔로잉 ✓' : '+ 팔로우'}
                 </button>
               ` : '<span style="font-size:11px;color:#64748b;padding:0 8px;white-space:nowrap;">본인</span>'}
@@ -1356,7 +2458,11 @@
       renderRunnersList();
     }
 
+    // App Initialization
     window.addEventListener("DOMContentLoaded", async () => {
+      // 사용자가 직접 고친 칸은 '확인 필요' 표시를 지운다
+      document.getElementById("record-form").addEventListener("input", (e) => e.target.classList.remove("needs-check"));
+      document.getElementById("cat-buttons-wrap").addEventListener("click", (e) => e.currentTarget.classList.remove("needs-check"));
       await initIndexedDB();
       await initAuthListener();
       await syncFromCloud();
@@ -1366,7 +2472,6 @@
       const statusBadge = document.getElementById("cloud-status-badge");
 
       if (!currentUser) {
-        // 비로그인 상태일 때는 개인 기록실을 비우고 게스트 모드로 동작
         records = [];
         if (statusBadge) statusBadge.innerHTML = "☁️ 비로그인 (게스트)";
         sortAndRenderApp();
@@ -1392,10 +2497,9 @@
               hours: row.hours,
               minutes: row.minutes,
               seconds: row.seconds,
-              pace: row.pace,
+              pace: calculatePace(row.hours, row.minutes, row.seconds, parseFloat(row.distance_km)),
               date: row.date,
               bib: row.bib || "",
-              weather: row.weather || "",
               notes: row.notes || "",
               certImageUrl: row.cert_image_url || null,
               hasCert: Boolean(row.cert_image_url)
@@ -1419,7 +2523,6 @@
       sortAndRenderApp();
     }
 
-    // Sort records in descending order of date (latest race at the top)
     function sortAndRenderApp() {
       records.sort((a, b) => {
         const dateA = new Date(a.date || '1970-01-01');
@@ -1436,6 +2539,8 @@
 
       records.forEach(r => {
         const sec = r.hours * 3600 + r.minutes * 60 + r.seconds;
+        if (sec <= 0) return;
+
         if (r.category === "Full" || r.distanceKm >= 42.0) {
           fCount++;
           if (!fBest || sec < (fBest.hours * 3600 + fBest.minutes * 60 + fBest.seconds)) fBest = r;
@@ -1489,35 +2594,34 @@
       }
 
       listEl.innerHTML = records.map(r => {
-        const tagClass = r.category === 'Full' ? 'tag-full' : (r.category === 'Half' ? 'tag-half' : 'tag-10k');
-        const tStr = `${String(r.hours).padStart(2,'0')}:${String(r.minutes).padStart(2,'0')}:${String(r.seconds).padStart(2,'0')}`;
+        const certBtn = r.hasCert ? `<button class="icon-btn cert" title="기록증 원본" onclick="openCertViewer(${jsArg(r.id)})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></button>` : '';
         return `
           <div class="rec-item">
             <div class="rec-top">
               <div>
-                <span class="tag ${tagClass}">${r.category} (${r.distanceKm}km)</span>
-                ${r.hasCert ? `<span class="tag" style="background:rgba(16,185,129,0.15);color:#34d399;cursor:pointer;" onclick="openCertViewer('${r.id}')">기록증 보관중</span>` : ''}
+                <span class="tag ${tagClassOf(r.category)}">${esc(r.category)} (${num(r.distanceKm)}km)</span>
+                ${r.hasCert ? `<span class="tag" style="background:rgba(16,185,129,0.15);color:#34d399;cursor:pointer;" onclick="openCertViewer(${jsArg(r.id)})">기록증 보관중</span>` : ''}
               </div>
-              <span class="rec-date">${r.date} ${r.bib ? `• BIB ${r.bib}` : ''}</span>
+              <span class="rec-date">${esc(r.date)} ${r.bib ? `• BIB ${esc(r.bib)}` : ''}</span>
             </div>
-            <div class="rec-name">${r.name}</div>
+            <div class="rec-name">${esc(r.name)}</div>
             <div class="rec-info-bar">
               <div>
-                <div class="rec-time">${tStr}</div>
-                <div class="rec-pace">평균 페이스 ${r.pace}</div>
+                <div class="rec-time">${fmtTime(r)}</div>
+                <div class="rec-pace">평균 페이스 ${esc(r.pace)}</div>
               </div>
               <div class="action-icons">
-                ${r.hasCert ? `<button class="icon-btn cert" title="기록증 원본" onclick="openCertViewer('${r.id}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></button>` : ''}
-                <button class="icon-btn" title="수정" onclick="openEditModal('${r.id}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
-                <button class="icon-btn" style="color:#f87171;" title="삭제" onclick="deleteRecord('${r.id}')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
+                ${certBtn}
+                <button class="icon-btn" title="수정" onclick="openEditModal(${jsArg(r.id)})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
+                <button class="icon-btn" style="color:#f87171;" title="삭제" onclick="deleteRecord(${jsArg(r.id)})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
               </div>
             </div>
+            ${r.notes ? `<div style="font-size:11px;color:#94a3b8;margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;word-break:break-word;">💬 ${esc(r.notes)}</div>` : ''}
           </div>
         `;
       }).join('');
     }
 
-    // Modal UI helper to update preview
     function updateCertPreviewUI(dataUrl) {
       const previewCard = document.getElementById("cert-preview-card");
       const previewImg = document.getElementById("cert-preview-img");
@@ -1541,8 +2645,6 @@
       img.classList.toggle("zoomed");
     }
 
-
-    // Choice Modal Handlers
     function openChoiceModal() {
       if (!currentUser) {
         alert("기록을 등록하려면 먼저 로그인해주세요!");
@@ -1560,6 +2662,8 @@
       closeChoiceModal();
       if (type === 'ocr') {
         triggerOcrUpload();
+      } else if (type === 'batch') {
+        triggerBatchUpload();
       } else {
         openCreateModal();
       }
@@ -1575,9 +2679,10 @@
       tempCertDataUrl = null;
       document.getElementById("modal-title").textContent = "새 대회 기록 등록";
       document.getElementById("record-form").reset();
-      document.getElementById("form-date").value = new Date().toISOString().split("T")[0];
+      document.getElementById("form-date").value = localTodayStr();
       selectCategory("Full", 42.195);
       updateCertPreviewUI(null);
+      clearOcrMarks();
       document.getElementById("input-modal").style.display = "flex";
       updateAutoPace();
     }
@@ -1588,6 +2693,7 @@
       currentEditingId = id;
       tempCertDataUrl = null;
       document.getElementById("modal-title").textContent = "대회 기록 수정";
+      clearOcrMarks();
       document.getElementById("form-name").value = rec.name;
       document.getElementById("form-dist").value = rec.distanceKm;
       document.getElementById("form-date").value = rec.date;
@@ -1595,7 +2701,6 @@
       document.getElementById("form-m").value = rec.minutes;
       document.getElementById("form-s").value = rec.seconds;
       document.getElementById("form-bib").value = rec.bib || "";
-      document.getElementById("form-weather").value = rec.weather || "";
       document.getElementById("form-notes").value = rec.notes || "";
       selectCategory(rec.category, rec.distanceKm);
 
@@ -1623,21 +2728,24 @@
       updateAutoPace();
     }
 
+    // 소수점 이하 무조건 내림(Math.floor) 처리 (1초라도 더 기록이 좋아보이게!)
+    function calculatePace(h, m, s, dist) {
+      if (!dist || dist <= 0) return "--'--\"";
+      const totalSec = (parseInt(h) || 0) * 3600 + (parseInt(m) || 0) * 60 + (parseInt(s) || 0);
+      if (totalSec <= 0) return "--'--\"";
+      const secPerKm = Math.floor(totalSec / dist);
+      const pMin = Math.floor(secPerKm / 60);
+      const pSec = secPerKm % 60;
+      return `${pMin}'${String(pSec).padStart(2, '0')}\"`;
+    }
+
     function updateAutoPace() {
       const dist = parseFloat(document.getElementById("form-dist").value) || 0;
       const h = parseInt(document.getElementById("form-h").value) || 0;
       const m = parseInt(document.getElementById("form-m").value) || 0;
       const s = parseInt(document.getElementById("form-s").value) || 0;
-      const totalSec = h * 3600 + m * 60 + s;
       const paceEl = document.getElementById("auto-pace-label");
-      if (dist <= 0 || totalSec <= 0) {
-        paceEl.textContent = "--'--\"";
-        return;
-      }
-      const secPerKm = totalSec / dist;
-      const pMin = Math.floor(secPerKm / 60);
-      const pSec = Math.round(secPerKm % 60);
-      paceEl.textContent = `${pMin}'${pSec < 10 ? '0' : ''}${pSec}\"`;
+      paceEl.textContent = calculatePace(h, m, s, dist);
     }
 
     async function handleFormSubmit(e) {
@@ -1663,14 +2771,11 @@
       const recId = currentEditingId || ("rec_" + Date.now());
       let finalCertUrl = null;
 
-      // Image upload handling
       if (tempCertDataUrl) {
         if (tempCertDataUrl.startsWith("http")) {
           finalCertUrl = tempCertDataUrl;
         } else {
-          // Upload to Supabase Storage
           finalCertUrl = await uploadCertToSupabase(recId, tempCertDataUrl);
-          // Also keep local indexedDB copy for instant offline viewing
           await dbSaveCert(recId, tempCertDataUrl);
         }
       } else if (currentEditingId) {
@@ -1685,16 +2790,14 @@
         hours: h,
         minutes: m,
         seconds: s,
-        pace: document.getElementById("auto-pace-label").textContent,
+        pace: calculatePace(h, m, s, dist),
         date: document.getElementById("form-date").value,
         bib: document.getElementById("form-bib").value.trim(),
-        weather: document.getElementById("form-weather").value.trim(),
         notes: document.getElementById("form-notes").value.trim(),
         certImageUrl: finalCertUrl,
         hasCert: Boolean(finalCertUrl)
       };
 
-      // 1. Always save locally first so user NEVER loses data!
       if (currentEditingId) {
         records = records.map(r => r.id === currentEditingId ? recData : r);
       } else {
@@ -1702,7 +2805,6 @@
       }
       saveState();
 
-      // 2. Save to Supabase Cloud DB
       let cloudSuccess = false;
       if (supabaseClient) {
         try {
@@ -1718,7 +2820,6 @@
             pace: recData.pace,
             date: recData.date,
             bib: recData.bib,
-            weather: recData.weather,
             notes: recData.notes,
             cert_image_url: recData.certImageUrl
           };
@@ -1726,21 +2827,16 @@
             .from('marathon_records')
             .upsert(dbRow, { onConflict: 'id' });
 
-          if (error) {
-            console.error("Supabase upsert error:", error);
-            alert("⚠️ 클라우드 저장 실패: " + (error.message || JSON.stringify(error)) + "\n(기록은 우선 스마트폰 로컬에 안전하게 보관되었습니다)");
-          } else {
-            cloudSuccess = true;
-          }
+          if (!error) cloudSuccess = true;
         } catch (err) {
           console.error("Cloud save error:", err);
-          alert("⚠️ 클라우드 통신 오류: " + err.message + "\n(스마트폰 로컬에는 저장되었습니다)");
         }
       }
 
       if (statusBadge) {
-        statusBadge.innerHTML = cloudSuccess ? "☁️ 클라우드 동기화 완료" : "⚠️ 로컬 보관 (동기화 재시도)";
+        statusBadge.textContent = cloudSuccess ? "☁️ 클라우드 동기화 완료" : "⚠️ 로컬 보관 (동기화 재시도)";
       }
+      if (cloudSuccess && typeof knownRaceNamesCache !== 'undefined') knownRaceNamesCache.at = 0;
       closeInputModal();
     }
 
@@ -1749,7 +2845,8 @@
 
       if (supabaseClient) {
         try {
-          await supabaseClient.from('marathon_records').delete().eq('id', id);
+          const { error } = await supabaseClient.from('marathon_records').delete().eq('id', id).eq('user_id', currentUser.id);
+          if (error) { alert("삭제 실패: " + error.message); return; }
         } catch (err) {
           console.warn("Cloud delete error:", err);
         }
@@ -1774,291 +2871,387 @@
       document.getElementById("hiddenOcrInput").click();
     }
 
-    function handleOcrFile(input) {
+    function triggerBatchUpload() {
+      if (!currentUser) {
+        alert("기록을 등록하려면 먼저 로그인해주세요!");
+        openAuthModal('login');
+        return;
+      }
+      document.getElementById("hiddenBatchInput").click();
+    }
+
+    async function handleOcrFile(input) {
       const file = input.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        openCreateModal();
-        tempCertDataUrl = e.target.result;
+
+      openCreateModal();
+      try {
+        const compressedDataUrl = await compressImageFile(file, 1200, 0.82);
+        tempCertDataUrl = compressedDataUrl;
         updateCertPreviewUI(tempCertDataUrl);
-        runOmniMarathonOcr(tempCertDataUrl);
-      };
-      reader.readAsDataURL(file);
+        await runOcrIntoForm(tempCertDataUrl);
+      } catch (err) {
+        console.error("OCR file compression error:", err);
+      }
       input.value = "";
     }
 
-    function handleModalCertChange(input) {
+    async function handleModalCertChange(input) {
       const file = input.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        tempCertDataUrl = e.target.result;
+      try {
+        const compressedDataUrl = await compressImageFile(file, 1200, 0.82);
+        tempCertDataUrl = compressedDataUrl;
         updateCertPreviewUI(tempCertDataUrl);
-        runOmniMarathonOcr(tempCertDataUrl);
+        await runOcrIntoForm(tempCertDataUrl);
+      } catch (err) {
+        console.error("Modal cert error:", err);
+      }
+    }
+
+    // ========================================================
+    // 기록증 판독 엔진 (Tesseract 워커 재사용 + 다중 전처리 + 투표 파서)
+    // - 글자용 워커(kor+eng)와 숫자 전용 워커(eng, 0-9 : .)를 한 번만 만들어 계속 쓴다
+    // - 패스: 원본 / 회색조 2배 대비보정 / 흰색분리 이진화 (글자)
+    //         흰색분리 원본·절반, 어두운글씨 절반 (숫자 전용 → 큰 기록 숫자, 배번)
+    // - 핵심 패스 결과가 불확실할 때만 희소(sparse) 레이아웃 패스 2개를 추가로 돈다
+    // ========================================================
+    const OCR = { textWorker: null, digitWorker: null, initPromise: null, queue: Promise.resolve() };
+    let knownRaceNamesCache = { at: 0, names: [] };
+
+    function localTodayStr() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    async function ensureOcrWorkers(onStatus) {
+      if (!OCR.initPromise) {
+        OCR.initPromise = (async () => {
+          if (onStatus) onStatus("판독 엔진 준비 중 (처음 한 번만 시간이 걸려요)...");
+          const tw = await Tesseract.createWorker('kor+eng', 1);
+          const dw = await Tesseract.createWorker('eng', 1);
+          await dw.setParameters({ tessedit_char_whitelist: '0123456789:.', tessedit_pageseg_mode: '11' });
+          OCR.textWorker = tw;
+          OCR.digitWorker = dw;
+        })();
+        OCR.initPromise.catch(() => { OCR.initPromise = null; });
+      }
+      return OCR.initPromise;
+    }
+
+    // DB에 이미 등록된 대회명(다른 러너가 고쳐서 저장한 이름 포함) → 같은 대회 기록증을 알아보는 데 사용
+    async function getKnownRaceNames() {
+      if (Date.now() - knownRaceNamesCache.at < 10 * 60 * 1000) return knownRaceNamesCache.names;
+      if (!supabaseClient) return [];
+      try {
+        const { data } = await supabaseClient.from('marathon_records').select('name').limit(3000);
+        const names = [...new Set((data || []).map(r => (r.name || '').trim()).filter(n => n && n !== '대회 미입력' && n !== '마라톤 대회 완주'))];
+        knownRaceNamesCache = { at: Date.now(), names };
+        return names;
+      } catch (e) {
+        return knownRaceNamesCache.names;
+      }
+    }
+
+    function loadImageEl(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function imageToCanvas(img, width) {
+      const w = Math.max(1, Math.round(width));
+      const h = Math.max(1, Math.round(img.naturalHeight * w / img.naturalWidth));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      return c;
+    }
+
+    // mode 'light': 흰색 계열(글자 상자·흰 글씨) ↔ 나머지 분리 / 'dark': 어두운 글씨만 검정으로
+    function canvasBinarize(src, mode) {
+      const c = document.createElement('canvas');
+      c.width = src.width; c.height = src.height;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      const imgData = src.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, src.width, src.height);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const black = mode === 'light' ? Math.min(r, g, b) > 200 : (0.299 * r + 0.587 * g + 0.114 * b) < 110;
+        const v = black ? 0 : 255;
+        d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      return c;
+    }
+
+    // 회색조 + 상하위 1% 잘라 대비 늘이기
+    function canvasGrayStretch(src) {
+      const c = document.createElement('canvas');
+      c.width = src.width; c.height = src.height;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      const imgData = src.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, src.width, src.height);
+      const d = imgData.data;
+      const n = d.length / 4;
+      const gray = new Uint8Array(n);
+      const hist = new Uint32Array(256);
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+        const v = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+        gray[j] = v; hist[v]++;
+      }
+      let acc = 0, lo = 0, hi = 255;
+      for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * 0.01) { lo = v; break; } }
+      acc = 0;
+      for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= n * 0.01) { hi = v; break; } }
+      const span = Math.max(1, hi - lo);
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+        const v = Math.max(0, Math.min(255, Math.round((gray[j] - lo) * 255 / span)));
+        d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      return c;
+    }
+
+    function needsMorePasses(parsed) {
+      const c = parsed.confidence || {};
+      return ['time', 'bib', 'date', 'category', 'name'].some(k => c[k] === 'none' || c[k] === 'low');
+    }
+
+    // 기록증 1장 판독 → 파싱 결과 반환 (동시에 여러 번 불려도 순서대로 처리)
+    function runCertificateOcr(dataUrl, onStatus) {
+      const job = OCR.queue.then(() => runCertificateOcrInner(dataUrl, onStatus));
+      OCR.queue = job.catch(() => {});
+      return job;
+    }
+
+    async function runCertificateOcrInner(dataUrl, onStatus) {
+      const say = (t) => { if (onStatus) onStatus(t); };
+      await ensureOcrWorkers(say);
+      const tw = OCR.textWorker, dw = OCR.digitWorker;
+      const img = await loadImageEl(dataUrl);
+      const W = img.naturalWidth;
+      const full = imageToCanvas(img, W);
+      const lightFull = canvasBinarize(full, 'light');
+
+      const passes = [];
+      const textPass = async (id, psm, canvas) => {
+        await tw.setParameters({ tessedit_pageseg_mode: psm });
+        const { data } = await tw.recognize(canvas);
+        passes.push({ id, kind: 'text', text: data.text || '' });
       };
-      reader.readAsDataURL(file);
+      const digitPass = async (id, canvas) => {
+        const { data } = await dw.recognize(canvas);
+        passes.push({ id, kind: 'digits', text: data.text || '' });
+      };
+
+      say("1/6 기록증 전체 글자 판독 중...");
+      await textPass('A', '3', full);
+      say("2/6 대비 보정본 판독 중...");
+      await textPass('G', '3', canvasGrayStretch(imageToCanvas(img, Math.min(2400, W * 2))));
+      say("3/6 흰 글씨·표 영역 판독 중...");
+      await textPass('H', '3', lightFull);
+      say("4/6 완주 기록 숫자 판독 중...");
+      await digitPass('D', lightFull);
+      say("5/6 큰 숫자 축소 판독 중...");
+      const half = imageToCanvas(img, W / 2);
+      await digitPass('E', canvasBinarize(half, 'light'));
+      say("6/6 진한 숫자 판독 중...");
+      await digitPass('F', canvasBinarize(half, 'dark'));
+
+      const knownRaceNames = await getKnownRaceNames();
+      const opts = { today: localTodayStr(), knownRaceNames };
+      let parsed = PBPBCertParser.parseCertificate(passes, opts);
+
+      if (needsMorePasses(parsed)) {
+        say("+ 불확실한 항목 재확인 중...");
+        await textPass('B', '11', full);
+        await textPass('C', '11', lightFull);
+        parsed = PBPBCertParser.parseCertificate(passes, opts);
+      }
+      parsed.pace = calculatePace(parsed.hours, parsed.minutes, parsed.seconds, parsed.distanceKm);
+      if (window.PBPB_DEBUG) parsed.debug.passTexts = passes;   // 개발용: 콘솔에서 PBPB_DEBUG = true
+      return parsed;
     }
 
-    // Canvas Filter: High-Contrast Pure Black on White
-    function processHighContrastCanvas(imgSrc, targetWidth = 640) {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          const cvs = document.createElement("canvas");
-          const scale = Math.min(1.0, targetWidth / img.naturalWidth);
-          cvs.width = Math.round(img.naturalWidth * scale);
-          cvs.height = Math.round(img.naturalHeight * scale);
-          const ctx = cvs.getContext("2d");
-          ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+    // ----- 입력 폼에 판독 결과 채우기 + 확인이 필요한 칸 표시 -----
+    const OCR_FIELD_LABEL = { name: '대회명', category: '종목', time: '완주 기록', bib: '배번', date: '날짜' };
 
-          const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
-          const d = imgData.data;
-
-          for (let i = 0; i < d.length; i += 4) {
-            const r = d[i], g = d[i+1], b = d[i+2];
-            if (r > 230 && g > 230 && b > 230) {
-              d[i] = 255; d[i+1] = 255; d[i+2] = 255;
-            } else {
-              d[i] = 0; d[i+1] = 0; d[i+2] = 0;
-            }
-          }
-          ctx.putImageData(imgData, 0, 0);
-          resolve(cvs.toDataURL("image/png"));
-        };
-        img.src = imgSrc;
-      });
+    function clearOcrMarks() {
+      document.querySelectorAll('.needs-check').forEach(el => el.classList.remove('needs-check'));
+      const note = document.getElementById('ocr-check-note');
+      if (note) { note.style.display = 'none'; note.textContent = ''; }
     }
 
-    // Canvas Filter: Dark Theme Inversion (Seoul Race & Dark Banners)
-    function processDarkInvertCanvas(imgSrc, targetWidth = 640) {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          const cvs = document.createElement("canvas");
-          const scale = Math.min(1.0, targetWidth / img.naturalWidth);
-          cvs.width = Math.round(img.naturalWidth * scale);
-          cvs.height = Math.round(img.naturalHeight * scale);
-          const ctx = cvs.getContext("2d");
-          ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
-
-          const imgData = ctx.getImageData(0, 0, cvs.width, cvs.height);
-          const d = imgData.data;
-
-          for (let i = 0; i < d.length; i += 4) {
-            const invR = 255 - d[i];
-            const invG = 255 - d[i+1];
-            const invB = 255 - d[i+2];
-            const gray = 0.299 * invR + 0.587 * invG + 0.114 * invB;
-            const bin = gray < 160 ? 0 : 255;
-            d[i] = bin; d[i+1] = bin; d[i+2] = bin;
-          }
-          ctx.putImageData(imgData, 0, 0);
-          resolve(cvs.toDataURL("image/png"));
-        };
-        img.src = imgSrc;
-      });
+    function markNeedsCheck(field) {
+      const map = {
+        name: ['form-name'], category: ['cat-buttons-wrap'], time: ['form-h', 'form-m', 'form-s'],
+        bib: ['form-bib'], date: ['form-date']
+      };
+      (map[field] || []).forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('needs-check'); });
     }
 
-    // Multi-pass Omni OCR Engine (Covers Table Certificates & Graphic Cards alike)
-    async function runOmniMarathonOcr(dataUrl) {
+    function weakFields(parsed) {
+      const c = parsed.confidence || {};
+      return Object.keys(OCR_FIELD_LABEL).filter(k => c[k] === 'none' || c[k] === 'low');
+    }
+
+    function applyOcrResultToForm(parsed) {
+      clearOcrMarks();
+      if (parsed.name) document.getElementById("form-name").value = parsed.name;
+      selectCategory(parsed.category, parsed.distanceKm);
+      if (parsed.hours || parsed.minutes || parsed.seconds) {
+        document.getElementById("form-h").value = parsed.hours;
+        document.getElementById("form-m").value = parsed.minutes;
+        document.getElementById("form-s").value = parsed.seconds;
+      }
+      if (parsed.bib) document.getElementById("form-bib").value = parsed.bib;
+      if (parsed.date) document.getElementById("form-date").value = parsed.date;
+      updateAutoPace();
+
+      const weak = weakFields(parsed);
+      weak.forEach(markNeedsCheck);
+      const note = document.getElementById('ocr-check-note');
+      if (note) {
+        note.classList.toggle('ok', !weak.length && !parsed.status);
+        if (parsed.status) {
+          note.textContent = `⚠️ 이 기록증은 완주 기록 대신 '${parsed.status}'로 표시되어 있어요. 완주 기록이 있어야 저장할 수 있습니다.`;
+        } else if (weak.length) {
+          note.textContent = `⚠️ 노란 칸(${weak.map(k => OCR_FIELD_LABEL[k]).join(', ')})은 자동인식이 확실하지 않아요. 사진과 비교해 확인해주세요.`;
+        } else {
+          note.textContent = '✅ 모든 항목을 인식했어요. 저장 전에 한 번만 훑어봐주세요.';
+        }
+        note.style.display = 'block';
+      }
+    }
+
+    async function runOcrIntoForm(dataUrl) {
       const overlay = document.getElementById("ocr-overlay");
       const statusText = document.getElementById("ocr-status-text");
       overlay.style.display = "flex";
-
       try {
-        statusText.textContent = "1/3단계: 공식 서식 및 텍스트 판독 중...";
-        const resRaw = await Tesseract.recognize(dataUrl, 'kor+eng');
-        const textRaw = resRaw.data.text || "";
-
-        statusText.textContent = "2/3단계: 라이트/컬러 대형 완주 기록 판독 중...";
-        const contrastUrl = await processHighContrastCanvas(dataUrl, 640);
-        const resContrast = await Tesseract.recognize(contrastUrl, 'eng');
-        const textContrast = resContrast.data.text || "";
-
-        statusText.textContent = "3/3단계: 다크 모드 및 반전 기록 판독 중...";
-        const invertUrl = await processDarkInvertCanvas(dataUrl, 640);
-        const resInvert = await Tesseract.recognize(invertUrl, 'eng');
-        const textInvert = resInvert.data.text || "";
-
-        parseAllCertificates(textRaw, textContrast, textInvert);
+        const parsed = await runCertificateOcr(dataUrl, (t) => { statusText.textContent = t; });
+        applyOcrResultToForm(parsed);
       } catch (err) {
         console.error(err);
-        alert("기록증 텍스트 인식에 실패했습니다. 직접 입력해주세요.");
+        alert("기록증 분석 중 오류가 발생했습니다. 직접 입력해주세요.");
       } finally {
         overlay.style.display = "none";
       }
     }
 
-    function parseAllCertificates(textRaw, textContrast, textInvert) {
-      const combined = `${textRaw}\n${textContrast}\n${textInvert}`;
-      const lines = combined.split('\n').map(l => l.trim()).filter(Boolean);
+    // ========================================================
+    // 기록증 대량 업로드 (판독 → 일괄 저장, 확인 필요한 항목은 마지막에 알려줌)
+    // ========================================================
+    async function handleBatchOcrFiles(input) {
+      const files = Array.from(input.files || []);
+      if (files.length === 0) return;
+      input.value = "";
 
-      // 1. Race Name Extraction
-      let rName = "";
-      if (combined.match(/(춘천마라톤|CHUNCHEON)/i)) {
-        rName = "2026 춘천마라톤";
-      } else if (combined.match(/(EVERLAND|에버랜드)/i)) {
-        rName = "EVERLAND 10K CIRCUIT RUN";
-      } else if (combined.match(/세종특별자치시/i)) {
-        rName = "제1회 세종특별자치시 전국 마라톤대회";
-      } else if (combined.match(/중랑구청장배/i)) {
-        rName = "제18회 중랑구청장배 장미 마라톤대회";
-      } else if (combined.match(/황금들녘/i) || (combined.match(/서산/i) && combined.match(/코스모스/i))) {
-        rName = "2025 서산 코스모스 황금들녘 마라톤대회";
-      } else if (combined.match(/안양천/i)) {
-        rName = "2026 안양천 장미꽃 축제 마라톤";
-      } else if (combined.match(/(서울달리기|SEOUL\s*RACE|SEOUL.*RACE|서울.*달리기)/i) || (combined.match(/(서울|SEOUL)/i) && combined.match(/(RACE|달리기|FINISHER)/i))) {
-        rName = "2026 서울달리기 (SEOUL RACE)";
-      } else {
-        for (const line of lines) {
-          if (line.match(/(마라톤대회|마라톤|달리기|CIRCUIT\s*RUN|축제)/i)) {
-            let cleaned = line
-              .replace(/모바일\s*기록증/gi, '')
-              .replace(/완주\s*기록증/gi, '')
-              .replace(/기록증/gi, '')
-              .replace(/CERTIFICATE\s*OF\s*RECORD/gi, '')
-              .replace(/CERTIFICATE/gi, '')
-              .replace(/완주를?\s*축하드립니다\.?/gi, '')
-              .replace(/완주를?\s*축하합니다\.?/gi, '')
-              .replace(/참가해?\s*주셔서\s*감사합니다\.?/gi, '')
-              .replace(/성공개최\s*기원/gi, '')
-              .trim();
-            if (cleaned.length >= 4 && !cleaned.includes("참가번호") && !cleaned.includes("FINISHER")) {
-              rName = cleaned;
-              break;
-            }
+      const progressModal = document.getElementById("batch-progress-modal");
+      const counterText = document.getElementById("batch-counter-text");
+      const progressBar = document.getElementById("batch-progress-bar");
+      const currentFileText = document.getElementById("batch-current-file-text");
+      progressModal.style.display = "flex";
+
+      const totalFiles = files.length;
+      let successCount = 0;
+      const batchRecordsToInsert = [];
+      const reviewList = [];
+      const failList = [];
+
+      for (let i = 0; i < totalFiles; i++) {
+        const file = files[i];
+        const pct = Math.round((i / totalFiles) * 100);
+        counterText.textContent = `${i + 1} / ${totalFiles} 진행 중 (${pct}%)`;
+        progressBar.style.width = `${pct}%`;
+        currentFileText.textContent = `[${file.name}] 압축 중...`;
+
+        try {
+          const compressedDataUrl = await compressImageFile(file, 1200, 0.82);
+          const parsed = await runCertificateOcr(compressedDataUrl, (t) => { currentFileText.textContent = `[${file.name}] ${t}`; });
+          if (!(parsed.hours || parsed.minutes || parsed.seconds)) {
+            failList.push(`• ${file.name}: ${parsed.status ? `'${parsed.status}' 기록증이라 등록하지 않음` : '완주 기록을 읽지 못해 등록하지 않음 (1장 자동인식으로 직접 확인해주세요)'}`);
+            continue;
           }
-        }
-      }
-      if (rName) document.getElementById("form-name").value = rName;
+          const recId = "rec_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
 
-      // 2. Category Detection
-      let matchedCat = null;
-      const courseMatch = textRaw.match(/(?:종\s*목|Course|종목|부\s*문|DIVISION)[\s:：|]+([가-힣A-Za-z0-9]+)/i);
-      if (courseMatch) {
-        const val = courseMatch[1].toLowerCase();
-        if (val.includes("half") || val.includes("하프")) matchedCat = "Half";
-        else if (val.includes("full") || val.includes("풀")) matchedCat = "Full";
-        else if (val.includes("10")) matchedCat = "10K";
-        else if (val.includes("5")) matchedCat = "5K";
-      }
+          currentFileText.textContent = `[${file.name}] 기록증 업로드 중...`;
+          const finalCertUrl = await uploadCertToSupabase(recId, compressedDataUrl);
+          await dbSaveCert(recId, compressedDataUrl);
 
-      if (!matchedCat) {
-        if (combined.match(/\b(Half|하프|Half\s*FINISHER)\b/i) || rName.includes("서울달리기") || rName.includes("안양천")) {
-          matchedCat = "Half";
-        } else if (combined.match(/\b(Full|풀|풀코스|Full\s*모바일)\b/i) || rName.includes("춘천마라톤")) {
-          matchedCat = "Full";
-        } else if (combined.match(/\b(10km|10k|10K\s*CIRCUIT)\b/i) || rName.includes("에버랜드") || rName.includes("세종") || rName.includes("중랑") || rName.includes("서산")) {
-          matchedCat = "10K";
-        }
-      }
+          const weak = weakFields(parsed);
+          if (weak.length) reviewList.push(`• ${parsed.name || file.name}: ${weak.map(k => OCR_FIELD_LABEL[k]).join(', ')}`);
 
-      if (matchedCat === "Half") selectCategory("Half", 21.0975);
-      else if (matchedCat === "Full") selectCategory("Full", 42.195);
-      else if (matchedCat === "10K") selectCategory("10K", 10.0);
-      else if (matchedCat === "5K") selectCategory("5K", 5.0);
-
-      // 3. Robust Finish Time Extraction
-      let timeFound = false;
-      const tableRecordMatch = textRaw.match(/(?:기\s*록|Record|기록)[\s:：|]+([0-2]?\d)[\s.:;]+([0-5]?\d)[\s.:;]+([0-5]?\d)(?:[.:](\d{1,3}))?/i);
-      if (tableRecordMatch) {
-        document.getElementById("form-h").value = parseInt(tableRecordMatch[1], 10);
-        document.getElementById("form-m").value = parseInt(tableRecordMatch[2], 10);
-        document.getElementById("form-s").value = parseInt(tableRecordMatch[3], 10);
-        timeFound = true;
-      }
-
-      if (!timeFound) {
-        const timeCandidates = [textContrast, textInvert, textRaw, combined];
-        for (const src of timeCandidates) {
-          if (timeFound) break;
-          const matches = [...src.matchAll(/(?:^|[^0-9])([0-2]?\d)[\s.:;]+([0-5]?\d)[\s.:;]+([0-5]?\d)(?:\.\d{1,3})?(?:[^0-9]|$)/g)];
-          for (const m of matches) {
-            const h = parseInt(m[1], 10);
-            const mi = parseInt(m[2], 10);
-            const s = parseInt(m[3], 10);
-            if (h >= 0 && h <= 12 && mi >= 0 && mi <= 59 && s >= 0 && s <= 59) {
-              if (mi !== 0 || s !== 0) {
-                document.getElementById("form-h").value = h;
-                document.getElementById("form-m").value = mi;
-                document.getElementById("form-s").value = s;
-                timeFound = true;
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      // 4. Bib Number Extraction
-      let bibVal = "";
-      const labeledBib = textRaw.match(/(?:배\s*번|Number|Bib|배번호|참가번호)[\s:：|\(Bib\)]+([0-9]{3,6})/i);
-      if (labeledBib) {
-        bibVal = labeledBib[1].trim();
-      }
-
-      if (!bibVal) {
-        const bibNearbyName = textRaw.match(/[가-힣]{2,4}\s+([0-9]{4,6})\b/);
-        if (bibNearbyName) {
-          bibVal = bibNearbyName[1].trim();
-        }
-      }
-
-      if (!bibVal) {
-        const allNums = combined.match(/\b([0-9]{4,6})\b/g);
-        if (allNums) {
-          const candidates = allNums.filter(n => {
-            if (n === "42195" || n === "21097") return false;
-            return n.length >= 4;
+          batchRecordsToInsert.push({
+            id: recId,
+            user_id: currentUser ? currentUser.id : null,
+            name: parsed.name || "대회 미입력",
+            category: parsed.category,
+            distance_km: parsed.distanceKm,
+            hours: parsed.hours,
+            minutes: parsed.minutes,
+            seconds: parsed.seconds,
+            pace: parsed.pace,
+            date: parsed.date || localTodayStr(),
+            bib: parsed.bib || "",
+            notes: "",
+            cert_image_url: finalCertUrl
           });
-          if (candidates.length > 0) bibVal = candidates[0];
+          successCount++;
+        } catch (fileErr) {
+          console.error(`Batch processing error on ${file.name}:`, fileErr);
+          failList.push(`• ${file.name}: 처리 실패`);
         }
       }
-      if (bibVal) document.getElementById("form-bib").value = bibVal;
 
-      // 5. Date Parsing
-      let rDate = "";
-      const engMonths = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06', jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+      progressBar.style.width = '100%';
+      counterText.textContent = `판독 완료! 총 ${successCount}개`;
+      currentFileText.textContent = "클라우드 데이터베이스에 저장 중...";
 
-      const engMatch = combined.match(/(January|February|March|April|May|June|July|August|September|October|November|December|Oct|Nov)[a-z]*[\s,]+([0-3]?\d)[,\s.]+(202\d)/i);
-      if (engMatch) {
-        const mon = engMonths[engMatch[1].slice(0,3).toLowerCase()] || '10';
-        rDate = `${engMatch[3]}-${mon}-${engMatch[2].padStart(2,'0')}`;
-      } else {
-        const korMatch = combined.match(/(202\d)[\s년연.\-/]+([0-1]?\d)[\s월.\-/]+([0-3]?\d)[\s일]?/);
-        if (korMatch) {
-          rDate = `${korMatch[1]}-${korMatch[2].padStart(2,'0')}-${korMatch[3].padStart(2,'0')}`;
+      let dbError = null;
+      if (batchRecordsToInsert.length > 0 && supabaseClient) {
+        try {
+          const { error } = await supabaseClient.from('marathon_records').upsert(batchRecordsToInsert, { onConflict: 'id' });
+          if (error) dbError = error;
+        } catch (dbErr) {
+          dbError = dbErr;
         }
       }
-      if (rDate) document.getElementById("form-date").value = rDate;
 
-      updateAutoPace();
+      knownRaceNamesCache.at = 0;
+      await syncFromCloud();
+      progressModal.style.display = "none";
 
-      // UI update for cert preview inside modal
-      updateCertPreviewUI(tempCertDataUrl);
-
-      const hVal = document.getElementById("form-h").value;
-      const mVal = document.getElementById("form-m").value;
-      const sVal = document.getElementById("form-s").value;
-      const timeMsg = (hVal !== "" && mVal !== "") ? `${hVal}시간 ${mVal}분 ${sVal || 0}초` : "직접 입력 필요";
-
-      alert(`기록증 분석 완료!\n• 대회명: ${document.getElementById("form-name").value || "미확인"}\n• 종목: ${activeCategory}\n• 완주 기록: ${timeMsg}\n• 배번: ${document.getElementById("form-bib").value || "미확인"}\n• 날짜: ${document.getElementById("form-date").value || "미확인"}\n\n입력창 상단의 기록증 사진을 보며 내용을 확인하고 [저장하기]를 눌러주세요.`);
+      let msg = dbError
+        ? `⚠️ 판독은 끝났지만 저장 중 오류가 났어요: ${dbError.message || dbError}`
+        : `🎉 대량 등록 완료!\n선택하신 ${totalFiles}장 중 ${successCount}개의 대회가 등록되었습니다.`;
+      if (reviewList.length) msg += `\n\n아래 항목은 자동인식이 확실하지 않으니 [수정]에서 확인해주세요:\n${reviewList.join('\n')}`;
+      if (failList.length) msg += `\n\n${failList.join('\n')}`;
+      alert(msg);
     }
 
-    // Personal Best (PB) Showcase Card Generation (1080 x 1080 Instagram Format)
+    // PB Showcase Photo Card (Instagram 1080x1080)
     function openPbModal() {
       const cvs = document.getElementById("pbCanvas");
       const ctx = cvs.getContext("2d");
       const W = 1080, H = 1080;
       cvs.width = W; cvs.height = H;
 
-      // 1. Calculate PBs
       let fBest = null, hBest = null, tBest = null;
       let totalFinishes = records.length;
 
       records.forEach(r => {
         const sec = r.hours * 3600 + r.minutes * 60 + r.seconds;
+        if (sec <= 0) return;
+
         if (r.category === "Full" || r.distanceKm >= 42.0) {
           if (!fBest || sec < (fBest.hours * 3600 + fBest.minutes * 60 + fBest.seconds)) fBest = r;
         } else if (r.category === "Half" || (r.distanceKm >= 21.0 && r.distanceKm < 22.0)) {
@@ -2068,7 +3261,6 @@
         }
       });
 
-      // 2. High-Tech Dark Background with Gradient
       const grad = ctx.createLinearGradient(0, 0, W, H);
       grad.addColorStop(0, '#090d16');
       grad.addColorStop(0.5, '#05070c');
@@ -2076,21 +3268,18 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
 
-      // Subtle Tech Grid
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)';
       ctx.lineWidth = 1;
       for (let x = 0; x <= W; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
       for (let y = 0; y <= H; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
-      // Outer Frame
       ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 4;
       ctx.strokeRect(50, 50, W - 100, H - 100);
 
-      // 3. Header Section
       ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('RUNNER PERSONAL BESTS', 80, 115);
+      ctx.fillText('PBPB • PERSONAL BEST PACE BOOK', 80, 115);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 48px sans-serif';
@@ -2100,55 +3289,29 @@
       ctx.font = '500 20px sans-serif';
       ctx.fillText(`TOTAL ${totalFinishes} RACES COMPLETED`, 80, 215);
 
-      // Helper function to format time
       const getTimeStr = (r) => {
         if (!r) return '--:--:--';
         return `${String(r.hours).padStart(2,'0')}:${String(r.minutes).padStart(2,'0')}:${String(r.seconds).padStart(2,'0')}`;
       };
 
-      // 4. Render 3 Distance Cards (10K, Half, Full)
       const sections = [
-        {
-          title: '10K COURSE',
-          sub: '10.0 KM',
-          badgeColor: '#38bdf8',
-          accentColor: '#38bdf8',
-          rec: tBest,
-          y: 260
-        },
-        {
-          title: 'HALF MARATHON',
-          sub: '21.0975 KM',
-          badgeColor: '#818cf8',
-          accentColor: '#818cf8',
-          rec: hBest,
-          y: 485
-        },
-        {
-          title: 'FULL MARATHON',
-          sub: '42.195 KM',
-          badgeColor: '#10b981',
-          accentColor: '#10b981',
-          rec: fBest,
-          y: 710
-        }
+        { title: '10K COURSE', sub: '10.0 KM', badgeColor: '#38bdf8', accentColor: '#38bdf8', rec: tBest, y: 260 },
+        { title: 'HALF MARATHON', sub: '21.0975 KM', badgeColor: '#818cf8', accentColor: '#818cf8', rec: hBest, y: 485 },
+        { title: 'FULL MARATHON', sub: '42.195 KM', badgeColor: '#10b981', accentColor: '#10b981', rec: fBest, y: 710 }
       ];
 
       sections.forEach(sec => {
         const cardX = 80, cardY = sec.y, cardW = 920, cardH = 200;
 
-        // Card Box Background & Border
         ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
         ctx.fillRect(cardX, cardY, cardW, cardH);
         ctx.strokeStyle = 'rgba(51, 65, 85, 0.8)';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(cardX, cardY, cardW, cardH);
 
-        // Accent indicator bar on the left edge
         ctx.fillStyle = sec.accentColor;
         ctx.fillRect(cardX, cardY, 6, cardH);
 
-        // Category Badge & Distance
         ctx.fillStyle = sec.badgeColor;
         ctx.font = 'bold 22px sans-serif';
         ctx.fillText(sec.title, cardX + 30, cardY + 45);
@@ -2157,13 +3320,11 @@
         ctx.font = '600 18px sans-serif';
         ctx.fillText(sec.sub, cardX + 30 + ctx.measureText(sec.title).width + 15, cardY + 45);
 
-        // Big Time Display
         ctx.fillStyle = '#ffffff';
         ctx.font = '900 68px monospace';
         const timeStr = getTimeStr(sec.rec);
         ctx.fillText(timeStr, cardX + 30, cardY + 125);
 
-        // Pace badge on the right
         if (sec.rec) {
           ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
           ctx.fillRect(cardX + cardW - 240, cardY + 55, 210, 75);
@@ -2183,7 +3344,6 @@
           ctx.fillText('NO RECORD', cardX + cardW - 200, cardY + 105);
         }
 
-        // Sub Meta: Race Name & Date
         ctx.fillStyle = '#94a3b8';
         ctx.font = '500 18px sans-serif';
         if (sec.rec) {
@@ -2194,15 +3354,14 @@
         }
       });
 
-      // 5. Footer Branding
       ctx.fillStyle = '#475569';
       ctx.font = 'bold 18px sans-serif';
-      ctx.fillText('POWERED BY MARATHON ARCHIVE', 80, 985);
+      ctx.fillText('POWERED BY PBPB • PERSONAL BEST PACE BOOK', 80, 985);
 
       const todayStr = new Date().toISOString().split('T')[0];
       ctx.fillStyle = '#334155';
       ctx.font = '16px sans-serif';
-      const dateNotice = `SHOWCASE GENERATED ON ${todayStr}`;
+      const dateNotice = `GENERATED ON ${todayStr}`;
       ctx.fillText(dateNotice, W - 80 - ctx.measureText(dateNotice).width, 985);
 
       document.getElementById("pb-share-modal").style.display = "flex";
@@ -2211,7 +3370,7 @@
     function downloadPbCard() {
       const cvs = document.getElementById("pbCanvas");
       const a = document.createElement("a");
-      a.download = `마라톤_PB_종합쇼케이스_${new Date().toISOString().split('T')[0]}.png`;
+      a.download = `PBPB_마라톤_PB_쇼케이스_${new Date().toISOString().split('T')[0]}.png`;
       a.href = cvs.toDataURL("image/png");
       a.click();
     }
@@ -2229,7 +3388,7 @@
         imgUrl = await dbGetCert(id);
       }
 
-      if (!imgUrl) {
+      if (!imgUrl || !isSafeUrl(imgUrl)) {
         alert("기록증 이미지를 찾을 수 없습니다.");
         return;
       }
