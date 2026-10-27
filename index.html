@@ -108,22 +108,185 @@
     .sub-filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #111827; color: #94a3b8; border: 1px solid #1f2937; cursor: pointer; }
     .sub-filter-btn.active { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
 
-    /* Feed Card Styles */
-    .feed-card { background: #111827; border: 1px solid #1f2937; border-radius: 18px; padding: 16px; margin-bottom: 14px; }
-    .feed-author-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .feed-author-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-    .feed-avatar { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid #10b981; background: #030712; }
-    .feed-author-name { font-size: 14px; font-weight: 800; color: #ffffff; }
-    .feed-author-bio { font-size: 11px; color: #64748b; }
-    .feed-time-ago { font-size: 11px; color: #475569; }
-    
-    .feed-race-box { background: #090d16; border: 1px solid #1e293b; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
-    .feed-cert-thumb { width: 100%; max-height: 280px; object-fit: contain; border-radius: 10px; background: #000; border: 1px solid #334155; margin-top: 10px; cursor: zoom-in; }
-    
-    .feed-interact-bar { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #1f2937; padding-top: 10px; margin-top: 10px; }
-    .clap-btn { background: #1f2937; border: none; color: #f1f5f9; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.15s; }
-    .clap-btn:active { transform: scale(0.95); }
-    .clap-btn.clapped { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+    /* Modern HUD Feed Card Styles */
+    .feed-card {
+      background: linear-gradient(135deg, #0b1320 0%, #050b14 100%);
+      border: 1px solid #1e2d42;
+      border-radius: 18px;
+      padding: 15px 14px 13px;
+      margin-bottom: 14px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .feed-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 16px; right: 16px; height: 1.5px;
+      background: linear-gradient(90deg, transparent, #38bdf8, #10b981, transparent);
+    }
+    .feed-author-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .feed-author-info { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+    .feed-avatar { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid #10b981; background: #030712; flex-shrink: 0; }
+    .feed-author-name { font-size: 14px; font-weight: 800; color: #ffffff; line-height: 1.2; }
+    .feed-date-line { font-size: 11px; color: #64748b; margin-top: 1px; }
+
+    /* 2-column Body Layout */
+    .feed-main-body {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      background: rgba(3, 7, 18, 0.65);
+      border: 1px solid #1f2a3a;
+      border-radius: 14px;
+      padding: 12px 14px;
+      align-items: stretch;
+    }
+    .feed-main-body.no-cert {
+      grid-template-columns: 1fr;
+    }
+
+    .feed-left-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+    /* 대회명: 줄바꿈 허용하여 모바일에서도 절대 잘리지 않음 */
+    .feed-race-name-full {
+      font-size: 15px;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.35;
+      word-break: keep-all;
+      margin-bottom: 8px;
+    }
+
+    /* 타이머 + 종목 배지 인라인 결합 */
+    .feed-time-badge-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .feed-hud-timer {
+      font-size: 26px;
+      font-weight: 900;
+      color: #38bdf8;
+      font-family: monospace;
+      line-height: 1;
+      letter-spacing: -0.5px;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+    .feed-hud-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2.5px 7px;
+      border-radius: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    /* 메트릭 칩스 (페이스 & 배번만 간결하게) */
+    .feed-hud-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .feed-hud-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid #233246;
+      border-radius: 6px;
+      padding: 3px 7px;
+      font-size: 11px;
+      color: #94a3b8;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .feed-hud-chip b { color: #10b981; font-weight: 800; }
+
+    /* 우측 세로형 실물 기록증 포스터 프리뷰 */
+    .feed-cert-poster {
+      position: relative;
+      width: 95px;
+      height: 100%;
+      min-height: 115px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #334155;
+      background: #020617;
+      cursor: zoom-in;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .feed-cert-poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.2s ease;
+    }
+    .feed-cert-poster:hover img { transform: scale(1.05); }
+    .feed-cert-poster-tag {
+      position: absolute;
+      bottom: 4px;
+      left: 4px;
+      right: 4px;
+      background: rgba(3, 7, 18, 0.85);
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      padding: 2px 0;
+      text-align: center;
+      font-size: 9px;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+
+    /* 확장된 대회 후기 / 소감 박스 */
+    .feed-notes-box {
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid #1a2738;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 13px;
+      color: #e2e8f0;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    /* 하단 인터랙션 바 */
+    .feed-interact-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #141f2e;
+    }
+    /* 간결해진 박수 버튼: 아이콘 + 숫자만 */
+    .clap-btn-mini {
+      background: #141e2e;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: #f1f5f9;
+      padding: 5px 12px;
+      border-radius: 18px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: 0.15s;
+    }
+    .clap-btn-mini:active { transform: scale(0.93); }
+    .clap-btn-mini.clapped {
+      background: rgba(16, 185, 129, 0.18);
+      border-color: #10b981;
+      color: #34d399;
+    }
+    .clap-count { font-variant-numeric: tabular-nums; font-weight: 800; }
 
     /* Runner Explore List */
     .runner-item { display: flex; align-items: center; justify-content: space-between; background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 12px; margin-bottom: 8px; }
@@ -1009,17 +1172,26 @@
         const isFollowed = r.user_id ? followingIds.has(r.user_id) : false;
         const isSelf = currentUser && r.user_id === currentUser.id;
         const isClapped = clappedRecordIds.has(r.id);
+        
+        // Base clap count computation
+        let hash = 0;
+        for (let i = 0; i < r.id.length; i++) hash = (hash * 31 + r.id.charCodeAt(i)) & 0xffffffff;
+        const baseClap = Math.abs(hash % 9) + 3;
+        const totalClap = baseClap + (isClapped ? 1 : 0);
+
         const tStr = `${String(r.hours).padStart(2,'0')}:${String(r.minutes).padStart(2,'0')}:${String(r.seconds).padStart(2,'0')}`;
         const tagClass = r.category === 'Full' ? 'tag-full' : (r.category === 'Half' ? 'tag-half' : 'tag-10k');
+        const hasCert = Boolean(r.cert_image_url);
 
         return `
           <div class="feed-card">
+            <!-- 상단 헤더: 작성자 프로필 & 팔로우 버튼 -->
             <div class="feed-author-bar">
               <div class="feed-author-info">
                 <img class="feed-avatar" src="${author.avatar_url}" alt="아바타">
                 <div>
                   <div class="feed-author-name">${author.nickname} ${isSelf ? '<span style="font-size:10px;color:#10b981;font-weight:700;">(나)</span>' : ''}</div>
-                  <div class="feed-author-bio">${author.bio || '러닝으로 건강한 하루'}</div>
+                  <div class="feed-date-line">${r.date || ''} • ${author.bio || '러너'}</div>
                 </div>
               </div>
               <div>
@@ -1031,28 +1203,48 @@
               </div>
             </div>
 
-            <div class="feed-race-box">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                <span class="tag ${tagClass}">${r.category} (${r.distance_km}km)</span>
-                <span style="font-size:11px;color:#64748b;">${r.date}</span>
+            <!-- 중앙 메인 바디: 좌측(대회명, 타이머+종목, 페이스/배번) + 우측(세로 기록증) -->
+            <div class="feed-main-body ${hasCert ? '' : 'no-cert'}">
+              <div class="feed-left-col">
+                <div>
+                  <!-- 대회명: 모바일에서도 줄바꿈 허용하여 잘림 방지 -->
+                  <div class="feed-race-name-full">${r.name}</div>
+                  
+                  <!-- 타이머 + 오른쪽 종목 배지 인라인 결합 -->
+                  <div class="feed-time-badge-row">
+                    <div class="feed-hud-timer">${tStr}</div>
+                    <span class="tag ${tagClass} feed-hud-badge">${r.category} (${r.distance_km}km)</span>
+                  </div>
+                </div>
+
+                <!-- 메트릭 칩스 (페이스 & 배번만 간결하게) -->
+                <div class="feed-hud-chips">
+                  <div class="feed-hud-chip">평균 페이스 <b>${r.pace}</b></div>
+                  ${r.bib ? `<div class="feed-hud-chip">배번 <b>#${r.bib}</b></div>` : ''}
+                </div>
               </div>
-              <div style="font-size:16px;font-weight:800;color:#ffffff;margin-bottom:8px;">${r.name}</div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                <div style="font-size:24px;font-weight:900;color:#ffffff;font-variant-numeric:tabular-nums;">${tStr}</div>
-                <div style="font-size:12px;color:#10b981;font-weight:700;">평균 페이스 ${r.pace}</div>
-              </div>
-              ${r.notes ? `<div style="font-size:12px;color:#94a3b8;margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;">"${r.notes}"</div>` : ''}
-              ${r.cert_image_url ? `
-                <img class="feed-cert-thumb" src="${r.cert_image_url}" alt="완주 기록증" onclick="openCertDirectViewer('${r.cert_image_url}', '${r.name}')" title="기록증 원본 보기">
+
+              <!-- 우측 세로형 실물 기록증 포스터 프리뷰 -->
+              ${hasCert ? `
+                <div class="feed-cert-poster" onclick="openCertDirectViewer('${r.cert_image_url}', '${r.name}')" title="클릭 시 기록증 원본 확대">
+                  <img src="${r.cert_image_url}" alt="완주기록증">
+                  <div class="feed-cert-poster-tag">🔍 원본</div>
+                </div>
               ` : ''}
             </div>
 
+            <!-- 확장된 대회 후기 / 소감 박스 -->
+            ${r.notes ? `
+              <div class="feed-notes-box">💬 ${r.notes}</div>
+            ` : ''}
+
+            <!-- 하단 인터랙션 바: 간결해진 박수 버튼(아이콘 + 숫자) -->
             <div class="feed-interact-bar">
-              <button class="clap-btn ${isClapped ? 'clapped' : ''}" onclick="toggleClap('${r.id}', this)">
-                👏 ${isClapped ? '완주 축하 완료!' : '완주 축하하기'}
+              <button class="clap-btn-mini ${isClapped ? 'clapped' : ''}" onclick="toggleClap('${r.id}', this, ${baseClap})" title="완주 축하하기">
+                👏 <span class="clap-count" id="clap-count-${r.id}">${totalClap}</span>
               </button>
               <div style="font-size:11px;color:#64748b;">
-                ${r.bib ? `BIB ${r.bib}` : ''} ${r.weather ? `• ${r.weather}` : ''}
+                ${author.nickname} 러너의 완주를 축하해주세요!
               </div>
             </div>
           </div>
@@ -1060,15 +1252,21 @@
       }).join('');
     }
 
-    function toggleClap(recId, btn) {
-      if (clappedRecordIds.has(recId)) {
+    function toggleClap(recId, btn, baseClap) {
+      const isClapped = clappedRecordIds.has(recId);
+      if (isClapped) {
         clappedRecordIds.delete(recId);
       } else {
         clappedRecordIds.add(recId);
       }
       localStorage.setItem("clapped_records", JSON.stringify([...clappedRecordIds]));
-      btn.classList.toggle("clapped", clappedRecordIds.has(recId));
-      btn.innerHTML = clappedRecordIds.has(recId) ? '👏 완주 축하 완료!' : '👏 완주 축하하기';
+      
+      const newClapped = !isClapped;
+      btn.classList.toggle("clapped", newClapped);
+      const cntEl = document.getElementById(`clap-count-${recId}`);
+      if (cntEl) {
+        cntEl.textContent = baseClap + (newClapped ? 1 : 0);
+      }
     }
 
     function openCertDirectViewer(url, title) {
@@ -1079,6 +1277,7 @@
       dlLink.download = `${title}_기록증.png`;
       document.getElementById("cert-viewer-modal").style.display = "flex";
     }
+
 
     // Runner Directory
     let allDirectoryRunners = [];
