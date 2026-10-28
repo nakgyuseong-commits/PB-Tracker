@@ -52,7 +52,8 @@
   function timeCandidates(passes) {
     const votes = new Map();
     for (const p of passes) {
-      const lines = linesOf(p);
+      // 기록 두 개가 붙어서 읽힌 경우 분리: 00:42:29000:40:21 → 00:42:29 00:40:21
+      const lines = linesOf(p).map(l => l.replace(/(\d{1,2}:\d{2}:\d{2})0?(\d{2}:\d{2}:\d{2})/g, '$1 $2'));
       lines.forEach((line, i) => {
         const labeled = RECORD_LABEL.test(line) || (i > 0 && RECORD_LABEL.test(lines[i - 1]) && !/\d/.test(lines[i - 1]));
         // 00:58:51 / 01:59:32.58 / 0:50:51 / 701:58:38(앞 숫자 오인식) — 날짜(2026.10.18)는 제외
@@ -94,6 +95,28 @@
     if (/^5K|^5KM/.test(t)) return '5K';
     return null;
   }
+  // 종목 칸의 실제 거리(km). 10.5km처럼 표준이 아닌 코스를 알아보기 위함
+  function bucketOfKm(km) {
+    if (km >= 40 && km <= 43) return 'Full';
+    if (km >= 20 && km <= 22) return 'Half';
+    if (km >= 9.5 && km <= 11) return '10K';
+    if (km >= 4.5 && km <= 5.5) return '5K';
+    return null;
+  }
+  function courseKmCandidates(passes) {
+    const votes = new Map();
+    for (const p of passes) {
+      if (p.kind !== 'text') continue;
+      const lines = linesOf(p);
+      lines.forEach((line, i) => {
+        if (!COURSE_LABEL.test(line)) return;
+        const tail = [line.split(COURSE_LABEL).pop(), lines[i + 1] || ''].join(' ');
+        const m = tail.match(/(?<![\d.])(\d{1,2}(?:[.,]\d{1,3})?)\s*[kK](?:[mM]|[mM]?\b)/);
+        if (m) { const km = parseFloat(m[1].replace(',', '.')); if (km > 0 && km < 100) addVote(votes, String(km), 1); }
+      });
+    }
+    return ranked(votes);
+  }
   function categoryCandidates(passes) {
     const votes = new Map();
     for (const p of passes) {
@@ -102,6 +125,8 @@
       lines.forEach((line, i) => {
         if (COURSE_LABEL.test(line)) {
           const after = line.split(COURSE_LABEL).pop();
+          const dm = [after, lines[i + 1] || ''].join(' ').match(/(?<![\d.])(\d{1,2}[.,]\d{1,3})\s*[kK]/);
+          if (dm) { const b = bucketOfKm(parseFloat(dm[1].replace(',', '.'))); if (b) { addVote(votes, b, 3); return; } }
           const tryVals = [after, lines[i + 1] || '', lines[i + 2] || ''];
           for (let j = 0; j < tryVals.length; j++) {
             const toks = tryVals[j].replace(/[|_=\-:]/g, ' ').trim().split(' ');
@@ -116,7 +141,7 @@
         if (/\bHalf\b|\bHALF\b|하프/.test(line)) addVote(votes, 'Half', 1);
         if (/\bFull\b|\bFULL\b|풀코스/.test(line)) addVote(votes, 'Full', 1);
         if (/\b10\s?K(M)?\b|\b10\s?km\b/i.test(line)) addVote(votes, '10K', 1);
-        if (/\b5\s?K(M)?\b|\b5\s?km\b/i.test(line)) addVote(votes, '5K', 0.5);
+        if (/(?<![\d.])5\s?K(M)?\b|(?<![\d.])5\s?km\b/i.test(line)) addVote(votes, '5K', 0.5);
       });
     }
     return ranked(votes);
@@ -226,7 +251,10 @@
   // {year}, {ed}(회차) 자리는 판독한 값으로 채운다. base: 회차를 못 읽었을 때 연도로 추정하는 기준.
   const RACE_DICT = [
     { name: '{year} 춘천마라톤', all: [/춘천\s*마라톤|CHUNCHEON/i] },
-    { name: '{year} 서울달리기 (SEOUL RACE)', any: [/서울\s*달리기|SEOUL\s*RACE/i, /SEOUL[\s\S]{0,80}RACE/i] },
+    { name: '{year} Run your way Half Race Seoul', all: [/run\s*your\s*way/i, /half\s*race/i] },
+    { name: '{year} Run your way Seoul 10K', all: [/run\s*your\s*way/i] },
+    { name: '{year} 서울 K-마라톤대회', any: [/Seoul\s*K\s*-?\s*International/i, /서울\s*K\s*-\s*마라톤/] },
+    { name: '{year} 서울달리기 (SEOUL RACE)', any: [/서울\s*달리기|SEOUL\s*RACE/i, /SEOUL[^\n]{0,40}\n[^\n]{0,40}RACE/i] },
     { name: '{year} JTBC 서울마라톤', any: [/JTBC/i, /Jtb[ce]\b/], all: [/SEOUL|Seoul|서울/] },
     { name: '{year} 서울마라톤 (동아마라톤)', all: [/서울\s*마라톤|동아\s*마라톤|SEOUL\s*MARATHON/i] },
     { name: '{year} 경주국제마라톤', all: [/경주\s*국제\s*마라톤|GYEONGJU/i] },
@@ -252,8 +280,9 @@
   const GENERIC_BIGRAMS = new Set(['마라', '라톤', '톤대', '대회', '전국', '국마', '제회', '회장', '기록', '록증', '완주', '주기', '축제']);
   // 참고 목록 비교에서 무시할 흔한 말 (대회명마다 들어가는 단어)
   const REF_COMMON = new Set(['마라', '라톤', '톤대', '대회', '전국', '국제', '하프', '트레', '레일', '레이', '이스', '러닝', '축제', '페스', '스티', '티벌', '회장', '장배', '청장', '시장', '구청', '체육', '육회', '달리', '리기', '걷기', '육상', '상연', '연맹', '일보', '아일', '신문']);
+  const COMMON_EN = /\b(SEOUL|KOREA|RACE|RUN|RUNNER|RUNNING|MARATHON|HALF|FULL|CERTIFICATE|RECORD|OF|THE|INTERNATIONAL|FINISHER|FINISH|START|DATE|NAME|COURSE|NUMBER|BIB|TIME|GENDER|MALE|FEMALE|DIVISION|KM|K)\b/gi;
   function bigrams(s) {
-    const t = String(s).replace(/제\s*\d+\s*회/g, '').replace(/20\d\d/g, '').replace(/[^가-힣A-Za-z]/g, '').toUpperCase();
+    const t = String(s).replace(COMMON_EN, ' ').replace(/제\s*\d+\s*회/g, '').replace(/20\d\d/g, '').replace(/[^가-힣A-Za-z]/g, '').toUpperCase();
     const out = new Set();
     for (let i = 0; i < t.length - 1; i++) { const b = t.slice(i, i + 2); if (!GENERIC_BIGRAMS.has(b)) out.add(b); }
     return out;
@@ -288,6 +317,7 @@
     line = line
       .replace(/(완주를?\s*)?축하(드립)?(합)?니다\.?|완주를?/g, ' ')
       .replace(/마라[톤튼]\s*[대내매][회위희]/g, '마라톤대회').replace(/마란톤/g, '마라톤')
+      .replace(/(?<=[A-Za-z])[.,]/g, '')
       .replace(/\s+/g, ' ').trim();
     const toks = line.split(' ').filter(t => {
       if (/^(.)\1+$/.test(t)) return false;                              // AAA 같은 반복 글자
@@ -295,6 +325,7 @@
       if (/^20\d\d$/.test(t)) return true;
       if (/^[가-힣]{2,}$/.test(t)) return true;                         // 한글 단어
       if (/^[A-Z][A-Z0-9]{2,}$/.test(t)) return true;                   // 대문자 영단어
+      if (/^[A-Z][a-z]{2,}$/.test(t)) return true;                      // 첫 글자 대문자 영단어
       if (/^\d{1,2}K$/i.test(t)) return true;
       return false;
     });
@@ -403,7 +434,22 @@
     // 종목이 확실하면 그 거리에서 말이 되는 기록만, 아니면 기록으로 종목을 추정
     let category = cats.length ? cats[0].key : null;
     let time = null;
-    if (category) time = times.find(t => plausible(t.extra.sec, category)) || null;
+    let courseNote = '';
+    const kms = courseKmCandidates(passes);
+    const courseKm = kms.length ? parseFloat(kms[0].key) : null;
+    const STD = { Full: 42.195, Half: 21.0975, '10K': 10, '5K': 5 };
+    if (category && courseKm && Math.abs(courseKm - STD[category]) > 0.2) {
+      // 예: 10.5km 대회에 '10km 00:40:21' 구간 기록이 함께 적힌 경우 → 짧은 쪽이 표준 거리 기록
+      const strong = times.filter(t => t.hits >= 2 && plausible(t.extra.sec, category)).sort((a, b) => a.extra.sec - b.extra.sec);
+      if (strong.length >= 2) {
+        time = strong[0];
+        const whole = strong[strong.length - 1];
+        courseNote = `${courseKm}km 완주 기록 ${whole.key}`;
+      } else if (strong.length === 1) {
+        courseNote = `${courseKm}km 코스`;
+      }
+    }
+    if (category && !time) time = times.find(t => plausible(t.extra.sec, category)) || null;
     if (!time && times.length) time = times[0];
     if (!category && time) {
       const sec = time.extra.sec;
@@ -433,6 +479,8 @@
       bib,
       date,
       status,
+      courseKm,
+      courseNote,
       confidence: conf,
       debug: { times: times.slice(0, 4), cats, bibs: bibs.slice(0, 4), dates: dates.slice(0, 4) }
     };
@@ -593,6 +641,8 @@
     /* ---------- 프로필 (내 기록실 / 다른 러너) ---------- */
     .pf-top { display: flex; align-items: center; gap: 20px; padding: 16px 16px 0; }
     .pf-stats { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); text-align: center; }
+    .pf-stat { background: none; border: 0; padding: 4px 0; border-radius: 12px; }
+    button.pf-stat:active { background: var(--surface); }
     .pf-stat b { display: block; font-size: 19px; font-weight: 700; }
     .pf-stat span { font-size: 12.5px; color: var(--sub); }
     .pf-name { padding: 12px 16px 0; font-size: 15px; font-weight: 700; }
@@ -696,6 +746,51 @@
     .menu-item:active { background: var(--surface); }
     .menu-item svg { width: 22px; height: 22px; }
     .menu-item.danger { color: var(--danger); }
+    /* 마라톤 기록 예측기 */
+    .pd-wrap { padding: 4px 0 32px; }
+    .pd-card { margin: 12px 16px 0; padding: 16px; border-radius: 16px; background: var(--surface); }
+    .pd-src { font-size: 12.5px; color: var(--sub); margin-top: 6px; min-height: 18px; }
+    .pd-src b { color: var(--text); font-weight: 600; }
+    .pd-optional { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+    .pd-clear { background: none; border: 0; color: var(--sub); font-size: 12.5px; text-decoration: underline; padding: 4px 0; margin-left: auto; }
+    .pd-error { font-size: 13px; color: var(--danger); margin-top: 8px; }
+    .pd-select { width: 100%; height: 46px; border-radius: 12px; border: 1px solid var(--line-2); background: #FFFFFF; padding: 0 12px; font-size: 14.5px; }
+    .pd-hero { margin: 16px 16px 0; padding: 20px 18px; border-radius: 18px; background: var(--accent-soft); }
+    .pd-hero-label { font-size: 13px; color: #8A2E12; font-weight: 600; }
+    .pd-hero-time { font-size: 44px; font-weight: 800; letter-spacing: -1px; color: var(--text); line-height: 1.15; margin-top: 4px; }
+    .pd-hero-pace { font-size: 14px; color: var(--sub); margin-top: 2px; }
+    .pd-hero-pace b { color: var(--accent); font-weight: 700; }
+    .pd-badge { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px; background: var(--accent); color: #FFFFFF; font-size: 13px; font-weight: 700; }
+    .pd-compare { font-size: 13px; color: #8A2E12; margin-top: 10px; line-height: 1.5; }
+    .pd-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 16px 0; }
+    .pd-mini { background: var(--surface); border-radius: 14px; padding: 14px; min-width: 0; }
+    .pd-mini-value { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; margin-top: 2px; }
+    .pd-mini-sub { font-size: 12px; color: var(--sub); margin-top: 2px; }
+    .pd-strat { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 16px; }
+    .pd-strat > div { border: 1px solid var(--line-2); border-radius: 14px; padding: 12px 10px; text-align: center; min-width: 0; }
+    .pd-strat > div.mid { border-color: var(--accent); background: var(--accent-soft); }
+    .pd-strat-label { font-size: 12px; color: var(--sub); }
+    .pd-strat > div.mid .pd-strat-label { color: #8A2E12; font-weight: 600; }
+    .pd-strat-time { font-size: 16px; font-weight: 700; margin-top: 4px; }
+    .pd-strat-pace { font-size: 11.5px; color: var(--sub); }
+    .pd-splits { margin: 0 16px; border-top: 1px solid var(--line); }
+    .pd-split { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 11px 2px; border-bottom: 1px solid var(--line); font-size: 14px; align-items: center; }
+    .pd-split.head { font-size: 12px; color: var(--sub); padding: 8px 2px; }
+    .pd-split span:nth-child(2), .pd-split span:nth-child(3) { text-align: right; }
+    .pd-split span:nth-child(3) { font-weight: 700; }
+    .pd-split.half { background: var(--surface); }
+    .pd-how { margin: 20px 16px 0; border-radius: 14px; background: var(--surface); }
+    .pd-how summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+    .pd-how summary::-webkit-details-marker { display: none; }
+    .pd-how summary::after { content: ''; width: 8px; height: 8px; border-right: 1.8px solid var(--sub); border-bottom: 1.8px solid var(--sub); transform: rotate(45deg); margin-top: -4px; transition: transform 0.2s; }
+    .pd-how[open] summary::after { transform: rotate(-135deg); margin-top: 4px; }
+    .pd-how-body { padding: 0 16px 16px; font-size: 13.5px; line-height: 1.7; color: var(--text); }
+    .pd-how-body p { margin-bottom: 10px; }
+    .pd-formula { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #FFFFFF; border-radius: 10px; padding: 10px 12px; margin: 6px 0 10px; }
+    .pd-how-body ul { padding-left: 18px; margin-bottom: 10px; }
+    .pd-disclaimer { font-size: 12.5px; color: var(--sub); }
+    .menu-group { font-size: 13px; font-weight: 700; color: var(--sub); padding: 8px 8px 2px; }
+    .menu-divider { height: 1px; background: var(--line); margin: 8px 0; }
   </style>
 </head>
 <body>
@@ -979,12 +1074,114 @@
     </div>
   </div>
 
+  <!-- 팔로워 / 팔로잉 목록 (전체 화면) -->
+  <div id="follow-list-modal" class="page-modal" style="display:none; z-index:95;">
+    <div class="page" role="dialog" aria-modal="true" aria-labelledby="follow-list-title">
+      <div class="page-head">
+        <button class="icon-btn" aria-label="뒤로" onclick="closeFollowList()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h2 id="follow-list-title">팔로워</h2>
+        <span style="width:44px;"></span>
+      </div>
+      <div class="page-body" id="follow-list-root"></div>
+    </div>
+  </div>
+
+  <!-- 기록 상세 (게시물 하나, 좋아요 가능) -->
+  <div id="record-detail-modal" class="page-modal" style="display:none; z-index:96;">
+    <div class="page" role="dialog" aria-modal="true" aria-labelledby="record-detail-title">
+      <div class="page-head">
+        <button class="icon-btn" aria-label="뒤로" onclick="closeRecordDetail()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h2 id="record-detail-title">완주 기록</h2>
+        <span style="width:44px;"></span>
+      </div>
+      <div class="page-body" id="record-detail-root"></div>
+    </div>
+  </div>
+
+  <!-- 마라톤 기록 예측기 (전체 화면) -->
+  <div id="predictor-modal" class="page-modal" style="display:none; z-index:94;">
+    <div class="page" role="dialog" aria-modal="true" aria-labelledby="predictor-title">
+      <div class="page-head">
+        <button class="icon-btn" aria-label="뒤로" onclick="closeRacePredictor()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h2 id="predictor-title">마라톤 기록 예측기</h2>
+        <span style="width:44px;"></span>
+      </div>
+      <div class="page-body">
+        <div class="pd-wrap">
+          <div class="seg" role="tablist" aria-label="예측에 쓸 기록" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+            <button class="seg-btn active" id="pd-src-pb" role="tab" onclick="setPredictorSource('pb')">PB로</button>
+            <button class="seg-btn" id="pd-src-recent" role="tab" onclick="setPredictorSource('recent')">최근 기록으로</button>
+            <button class="seg-btn" id="pd-src-manual" role="tab" onclick="setPredictorSource('manual')">직접 입력</button>
+          </div>
+
+          <div class="pd-card">
+            <div class="fg">
+              <label for="pd-10-h">10K 기록</label>
+              <div class="time-row">
+                <input type="number" inputmode="numeric" id="pd-10-h" min="0" max="5" placeholder="시" aria-label="10K 시간" class="time-input pd-in">
+                <span class="time-colon">:</span>
+                <input type="number" inputmode="numeric" id="pd-10-m" min="0" max="59" placeholder="분" aria-label="10K 분" class="time-input pd-in">
+                <span class="time-colon">:</span>
+                <input type="number" inputmode="numeric" id="pd-10-s" min="0" max="59" placeholder="초" aria-label="10K 초" class="time-input pd-in">
+              </div>
+              <div class="pd-src" id="pd-10-src"></div>
+            </div>
+            <div class="fg" style="margin-top: 14px;">
+              <div style="display:flex; align-items:center;">
+                <label for="pd-hf-h">하프 기록<span class="pd-optional">있으면 더 정확해요</span></label>
+                <button type="button" class="pd-clear" id="pd-hf-clear" onclick="clearPredictorHalf()">비우기</button>
+              </div>
+              <div class="time-row">
+                <input type="number" inputmode="numeric" id="pd-hf-h" min="0" max="9" placeholder="시" aria-label="하프 시간" class="time-input pd-in">
+                <span class="time-colon">:</span>
+                <input type="number" inputmode="numeric" id="pd-hf-m" min="0" max="59" placeholder="분" aria-label="하프 분" class="time-input pd-in">
+                <span class="time-colon">:</span>
+                <input type="number" inputmode="numeric" id="pd-hf-s" min="0" max="59" placeholder="초" aria-label="하프 초" class="time-input pd-in">
+              </div>
+              <div class="pd-src" id="pd-hf-src"></div>
+            </div>
+            <div class="fg" id="pd-type-group" style="margin-top: 14px;">
+              <label for="pd-type">러너 유형</label>
+              <select id="pd-type" class="pd-select">
+                <option value="1.06">상급 · 월 200km 이상, 장거리 훈련 충분</option>
+                <option value="1.075" selected>일반 · 월 100~150km</option>
+                <option value="1.10">입문 · 월 100km 미만, 첫 풀코스</option>
+              </select>
+            </div>
+            <div class="pd-error" id="pd-error" role="alert" hidden></div>
+          </div>
+
+          <div id="pd-result"></div>
+
+          <details class="pd-how">
+            <summary>계산 방식 보기</summary>
+            <div class="pd-how-body">
+              <p>육상계에서 널리 쓰는 피트 리겔(Pete Riegel) 공식으로 계산해요.</p>
+              <div class="pd-formula">T2 = T1 × (D2 ÷ D1)<sup>k</sup></div>
+              <p>k는 거리가 길어질수록 페이스가 떨어지는 정도(피로 계수)예요. 보통 1.06~1.08 사이예요.</p>
+              <ul>
+                <li><b>10K만 있을 때</b>: 고른 러너 유형의 k로 하프와 풀코스를 계산해요.</li>
+                <li><b>10K와 하프가 있을 때</b>: 두 기록으로 나만의 k를 구하고, 30km 이후 체력이 떨어지는 구간을 반영해 0.01을 더해 풀코스를 계산해요.</li>
+              </ul>
+              <p><b>k 해석</b>: 1.05 미만은 지구력형, 1.05~1.08은 밸런스형, 1.08 초과는 스피드형이에요.</p>
+              <p class="pd-disclaimer">예측은 참고용이에요. 실제 기록은 훈련량, 코스, 날씨, 컨디션에 따라 달라져요.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 내 프로필 메뉴 -->
   <div id="profile-menu" class="overlay bottom" style="display:none;" onclick="if(event.target===this)closeProfileMenu()">
     <div class="sheet" role="dialog" aria-modal="true" aria-label="메뉴">
       <div class="sheet-grip"></div>
-      <button class="menu-item" onclick="closeProfileMenu(); openProfileModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>프로필 수정</button>
+      <div class="menu-group" id="menu-group-extra">부가서비스</div>
       <button class="menu-item" onclick="closeProfileMenu(); openPbModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 15l3-3 2 2 3-4"/></svg>PB 카드 만들기</button>
+      <button class="menu-item" onclick="closeProfileMenu(); openRacePredictor();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg>마라톤 기록 예측기</button>
+      <div class="menu-divider"></div>
+      <div class="menu-group" id="menu-group-settings">설정</div>
+      <button class="menu-item" onclick="closeProfileMenu(); openProfileModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>프로필 수정</button>
       <button class="menu-item danger" onclick="closeProfileMenu(); handleAuthBtnClick();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></svg>로그아웃</button>
       <button type="button" class="sheet-cancel" onclick="closeProfileMenu()">닫기</button>
     </div>
@@ -1467,7 +1664,7 @@
     let followingIds = new Set();
     let communityProfiles = new Map();
     let feedRecords = [];
-    let pbRecordIds = new Set();       // 러너별·종목별 최고 기록 (같은 종목 2회 이상일 때만 'PB' 표시)
+    let pbRecordIds = new Set();       // 러너별·종목별 최고 기록 (첫 완주도 PB)
     let profileTab = 'grid';           // 'grid' | 'list'
     let myFollowCounts = { followers: 0, following: 0 };
     let otherRunner = null;            // { id, profile, recs, counts, tab }
@@ -1624,6 +1821,11 @@
       if (currentMainView === 'feed') renderFeedUI();
       if (currentMainView === 'runners') renderRunnersList();
       if (currentMainView === 'ranking') renderRankingUI();
+      if (followListState) renderFollowList();
+      const detail = document.getElementById('record-detail-root');
+      if (document.getElementById('record-detail-modal').style.display === 'flex' && detail) {
+        detail.querySelectorAll('.follow-link').forEach(b => { if (followingIds.has(targetUserId)) b.remove(); });
+      }
       if (otherRunner && otherRunner.id === targetUserId) {
         otherRunner.counts = await loadFollowCounts(targetUserId);
         renderOtherRunner();
@@ -1663,7 +1865,7 @@
       (data || []).forEach(p => communityProfiles.set(p.id, p));
     }
 
-    // 러너별 종목 최고 기록 → 'PB' 배지 (해당 종목을 2번 이상 뛴 경우만)
+    // 러너별 종목 최고 기록 → PB 배지 (그 종목 첫 완주도 PB)
     async function loadPbIds() {
       if (!supabaseClient) return;
       try {
@@ -1673,7 +1875,7 @@
         const ids = new Set();
         byUser.forEach(list => {
           const best = computeBest(list);
-          Object.values(best).forEach(b => { if (b.count >= 2) ids.add(b.rec.id); });
+          Object.values(best).forEach(b => ids.add(b.rec.id));
         });
         pbRecordIds = ids;
       } catch (e) { /* 배지는 없어도 된다 */ }
@@ -1803,7 +2005,7 @@
     }
 
     async function shareRecord(recId) {
-      const row = feedRecords.find(r => r.id === recId);
+      const row = feedRecords.find(r => r.id === recId) || (otherRunner && (otherRunner.rows || []).find(r => r.id === recId));
       if (!row) return;
       const r = normRec(row);
       const nick = profileOf(r.userId).nickname || '러너';
@@ -1960,7 +2162,7 @@
       if (tab === 'grid') {
         return `<div class="grid3">${sorted.map(r => {
           const bucket = catBucket(r.category, r.distanceKm);
-          const action = isSelf ? `openEditModal(${jsArg(r.id)})` : (isSafeUrl(r.certImageUrl) ? `openCertDirectViewer(${jsArg(r.certImageUrl)}, ${jsArg(r.name)})` : '');
+          const action = isSelf ? `openEditModal(${jsArg(r.id)})` : `openRecordDetail(${jsArg(r.id)})`;
           return `
             <button class="tile" ${action ? `onclick="${action}"` : 'disabled'} aria-label="${esc(r.name)} ${shortTime(r)}">
               ${isSafeUrl(r.certImageUrl) ? `<img src="${safeUrl(r.certImageUrl)}" alt="" loading="lazy">` : `<span class="tile-text">${esc(r.name)}</span>`}
@@ -1970,7 +2172,7 @@
       }
       return sorted.map(r => {
         const bucket = catBucket(r.category, r.distanceKm);
-        const action = isSelf ? `openEditModal(${jsArg(r.id)})` : (isSafeUrl(r.certImageUrl) ? `openCertDirectViewer(${jsArg(r.certImageUrl)}, ${jsArg(r.name)})` : '');
+        const action = isSelf ? `openEditModal(${jsArg(r.id)})` : `openRecordDetail(${jsArg(r.id)})`;
         return `
           <div class="rec-row">
             <div class="row-main" ${action ? `role="button" tabindex="0" onclick="${action}"` : ''}>
@@ -2004,8 +2206,8 @@
           <img class="avatar av-80" src="${avatarOf(p, o.uid)}" alt="${nick} 프로필 사진">
           <div class="pf-stats">
             <div class="pf-stat"><b class="num">${o.recs.length}</b><span>완주</span></div>
-            <div class="pf-stat"><b class="num">${o.counts.followers}</b><span>팔로워</span></div>
-            <div class="pf-stat"><b class="num">${o.counts.following}</b><span>팔로잉</span></div>
+            <button class="pf-stat" onclick="openFollowList(${jsArg(o.uid)}, 'followers')" aria-label="팔로워 ${o.counts.followers}명 보기"><b class="num">${o.counts.followers}</b><span>팔로워</span></button>
+            <button class="pf-stat" onclick="openFollowList(${jsArg(o.uid)}, 'following')" aria-label="팔로잉 ${o.counts.following}명 보기"><b class="num">${o.counts.following}</b><span>팔로잉</span></button>
           </div>
         </div>
         ${o.showName ? `<div class="pf-name">${nick}</div>` : ''}
@@ -2056,6 +2258,7 @@
       if (!uid) return;
       const modal = document.getElementById("runner-archive-modal");
       const root = document.getElementById("other-runner-root");
+      document.getElementById('record-detail-modal').style.display = 'none';
       modal.style.display = "flex";
       root.innerHTML = '<div class="loading">기록을 불러오는 중…</div>';
       await loadProfilesFor([uid]);
@@ -2069,7 +2272,9 @@
           fetchFollowingList()
         ]);
         if (!otherRunner || otherRunner.id !== uid) return;
-        otherRunner.recs = (res.data || []).map(normRec);
+        otherRunner.rows = res.data || [];
+        otherRunner.recs = otherRunner.rows.map(normRec);
+        loadClapsFor(otherRunner.rows.map(r => r.id));
         otherRunner.counts = counts;
         renderOtherRunner();
       } catch (err) {
@@ -2087,11 +2292,276 @@
       }) + '<div style="height:32px;"></div>';
     }
 
+    // ---------- 좋아요 수 추가로 불러오기 (피드에 없는 기록용, 기존 값에 합침) ----------
+    async function loadClapsFor(ids) {
+      const need = ids.filter(id => !clapCounts.has(id));
+      if (!need.length || !supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient.from('claps').select('record_id, user_id').in('record_id', need);
+        if (error) return;
+        need.forEach(id => clapCounts.set(id, 0));
+        (data || []).forEach(c => {
+          clapCounts.set(c.record_id, (clapCounts.get(c.record_id) || 0) + 1);
+          if (currentUser && c.user_id === currentUser.id) myClaps.add(c.record_id);
+        });
+      } catch (e) { /* 숫자만 안 보일 뿐 */ }
+    }
+
+    // ---------- 기록 상세: 피드 게시물과 같은 카드 + 좋아요 ----------
+    async function openRecordDetail(recId) {
+      const row = (otherRunner && (otherRunner.rows || []).find(r => r.id === recId)) || feedRecords.find(r => r.id === recId);
+      if (!row) return;
+      const modal = document.getElementById('record-detail-modal');
+      const root = document.getElementById('record-detail-root');
+      modal.style.display = 'flex';
+      root.innerHTML = '<div class="loading">불러오는 중…</div>';
+      await Promise.all([loadClapsFor([recId]), loadProfilesFor([row.user_id]), loadPbIds()]);
+      document.getElementById('record-detail-title').textContent = profileOf(row.user_id).nickname || '완주 기록';
+      root.innerHTML = postHtml(row) + '<div style="height:32px;"></div>';
+    }
+    function closeRecordDetail() {
+      document.getElementById('record-detail-modal').style.display = 'none';
+      if (currentMainView === 'feed') renderFeedUI();   // 상세에서 누른 좋아요를 피드에도 반영
+    }
+
+    // ---------- 팔로워 / 팔로잉 목록 ----------
+    let followListState = null;   // { uid, kind, ids }
+    async function openFollowList(uid, kind) {
+      if (!uid) return;
+      const modal = document.getElementById('follow-list-modal');
+      const root = document.getElementById('follow-list-root');
+      document.getElementById('follow-list-title').textContent = kind === 'followers' ? '팔로워' : '팔로잉';
+      modal.style.display = 'flex';
+      root.innerHTML = '<div class="loading">불러오는 중…</div>';
+      followListState = { uid, kind, ids: [] };
+      try {
+        const q = kind === 'followers'
+          ? supabaseClient.from('follows').select('follower_id').eq('following_id', uid)
+          : supabaseClient.from('follows').select('following_id').eq('follower_id', uid);
+        const [{ data, error }] = await Promise.all([q, fetchFollowingList()]);
+        if (error) throw error;
+        const ids = [...new Set((data || []).map(r => kind === 'followers' ? r.follower_id : r.following_id).filter(Boolean))];
+        await loadProfilesFor(ids);
+        if (!followListState || followListState.uid !== uid || followListState.kind !== kind) return;
+        followListState.ids = ids;
+        renderFollowList();
+      } catch (e) {
+        console.error('follow list error:', e);
+        root.innerHTML = emptyHtml('목록을 불러오지 못했어요', '잠시 후 다시 시도해주세요.');
+      }
+    }
+    function renderFollowList() {
+      if (!followListState) return;
+      const root = document.getElementById('follow-list-root');
+      const { ids, kind } = followListState;
+      if (!ids.length) {
+        root.innerHTML = emptyHtml(kind === 'followers' ? '아직 팔로워가 없어요' : '아직 팔로우한 러너가 없어요', '');
+        return;
+      }
+      root.innerHTML = ids.map(id => {
+        const p = profileOf(id);
+        const isSelf = currentUser && id === currentUser.id;
+        const following = followingIds.has(id);
+        return `
+          <div class="row" style="padding-right: 16px;">
+            <button class="post-who" onclick="closeFollowList(); openRunnerArchiveModal(${jsArg(id)})">
+              <img class="avatar av-44" src="${avatarOf(p, id)}" alt="">
+              <span class="row-main">
+                <span class="row-title" style="display:block;">${esc(p.nickname || '러너')}${isSelf ? '<small>나</small>' : ''}</span>
+                <span class="row-sub" style="display:block;">${esc(p.bio || '')}</span>
+              </span>
+            </button>
+            ${(isSelf || !currentUser) ? '' : `<button class="follow-btn ${following ? 'following' : ''}" onclick="toggleFollow(${jsArg(id)}, this)">${following ? '팔로잉' : '팔로우'}</button>`}
+          </div>`;
+      }).join('');
+    }
+    function closeFollowList() {
+      document.getElementById('follow-list-modal').style.display = 'none';
+      followListState = null;
+    }
+
     function closeRunnerArchiveModal() {
       document.getElementById("runner-archive-modal").style.display = "none";
       otherRunner = null;
     }
     function updateOtherRunnerFollowBtn() { renderOtherRunner(); }
+
+    // ========================================================
+    // 마라톤 기록 예측기 (피트 리겔 공식)
+    // 기록 선택: PB(기본) / 최근 기록 / 직접 입력
+    // 하프 기록이 있으면 개인 피로 계수, 없으면 러너 유형 계수
+    // ========================================================
+    let predictorSource = 'pb';
+    const PD_D10 = 10, PD_DH = 21.0975, PD_DF = 42.195;
+
+    function pdFmtTime(sec) {
+      const t = Math.round(sec);
+      const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+      return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+    }
+    function pdFmtPace(sec, km) {
+      const p = Math.round(sec / km);          // 초 단위로 먼저 반올림해야 5'60" 같은 표기가 안 생긴다
+      return `${Math.floor(p / 60)}'${String(p % 60).padStart(2, '0')}"`;
+    }
+    function pdPick(kind) {
+      const rows = records.filter(r => secOf(r) > 0);
+      const pick = (bucket) => {
+        const list = rows.filter(r => catBucket(r.category, r.distanceKm) === bucket);
+        if (!list.length) return null;
+        if (kind === 'pb') return list.reduce((a, b) => (secOf(b) < secOf(a) ? b : a));
+        return list.reduce((a, b) => (String(b.date) > String(a.date) ? b : a));
+      };
+      return { k10: pick('10K'), half: pick('Half'), full: computeBest(records).Full ? computeBest(records).Full.rec : null };
+    }
+    function pdSetTime(prefix, rec) {
+      const v = rec ? [num(rec.hours), String(num(rec.minutes)).padStart(2, '0'), String(num(rec.seconds)).padStart(2, '0')] : ['', '', ''];
+      ['h', 'm', 's'].forEach((u, i) => { document.getElementById(`pd-${prefix}-${u}`).value = v[i]; });
+    }
+    function pdGetSec(prefix) {
+      const vals = ['h', 'm', 's'].map(u => document.getElementById(`pd-${prefix}-${u}`).value);
+      if (vals.every(v => v === '')) return 0;
+      return (parseInt(vals[0]) || 0) * 3600 + (parseInt(vals[1]) || 0) * 60 + (parseInt(vals[2]) || 0);
+    }
+    function pdSrcLine(rec, missingText) {
+      if (!rec) return missingText;
+      return `<b>${esc(rec.name)}</b> · ${esc(rec.date)}`;
+    }
+
+    function openRacePredictor() {
+      document.getElementById('predictor-modal').style.display = 'flex';
+      document.querySelector('#predictor-modal .page-body').scrollTop = 0;
+      const anyRec = records.some(r => secOf(r) > 0 && ['10K', 'Half'].includes(catBucket(r.category, r.distanceKm)));
+      if (!anyRec) { pdSetTime('10', null); pdSetTime('hf', null); }
+      setPredictorSource(anyRec ? 'pb' : 'manual');
+    }
+    function closeRacePredictor() { document.getElementById('predictor-modal').style.display = 'none'; }
+
+    function setPredictorSource(src) {
+      predictorSource = src;
+      ['pb', 'recent', 'manual'].forEach(k => document.getElementById(`pd-src-${k}`).classList.toggle('active', k === src));
+      if (src !== 'manual') {
+        const p = pdPick(src);
+        pdSetTime('10', p.k10);
+        pdSetTime('hf', p.half);
+        const label = src === 'pb' ? 'PB' : '최근 기록';
+        document.getElementById('pd-10-src').innerHTML = pdSrcLine(p.k10, `${label}으로 쓸 10K 기록이 없어요. 직접 입력해주세요.`.replace('PB으로', 'PB로'));
+        document.getElementById('pd-hf-src').innerHTML = pdSrcLine(p.half, '하프 기록이 없어서 러너 유형으로 계산해요.');
+      } else {
+        document.getElementById('pd-10-src').textContent = '';
+        document.getElementById('pd-hf-src').textContent = '';
+      }
+      calcRacePredictor();
+    }
+    function clearPredictorHalf() {
+      pdSetTime('hf', null);
+      onPredictorEdit();
+    }
+    // 자동으로 채운 값을 고치면 '직접 입력'으로 바뀐다
+    function onPredictorEdit() {
+      if (predictorSource !== 'manual') {
+        predictorSource = 'manual';
+        ['pb', 'recent', 'manual'].forEach(k => document.getElementById(`pd-src-${k}`).classList.toggle('active', k === 'manual'));
+        document.getElementById('pd-10-src').textContent = '';
+        document.getElementById('pd-hf-src').textContent = '';
+      }
+      calcRacePredictor();
+    }
+
+    function calcRacePredictor() {
+      const out = document.getElementById('pd-result');
+      const err = document.getElementById('pd-error');
+      const t10 = pdGetSec('10'), tH = pdGetSec('hf');
+      const both = tH > 0;
+      // 두 기록으로 구한 계수가 비현실적이면(1.0 미만/1.25 초과) 하프 기록 + 러너 유형으로 계산
+      const kPersonal = (both && t10 > 0 && tH > t10) ? Math.log(tH / t10) / Math.log(PD_DH / PD_D10) : null;
+      const usePersonal = kPersonal != null && kPersonal >= 1.0 && kPersonal <= 1.25;
+      document.getElementById('pd-type-group').hidden = usePersonal;
+      document.getElementById('pd-hf-clear').hidden = !both;
+      const fail = (msg) => { err.textContent = msg; err.hidden = !msg; out.innerHTML = msg ? '' : `<div class="empty" style="padding: 32px 24px;"><p>10K 기록을 넣으면 풀코스 기록을 예측해요.</p></div>`; };
+
+      if (!t10) return fail('');
+      if (t10 < 25 * 60 || t10 > 2.5 * 3600) return fail('10K 기록을 다시 확인해주세요.');
+      if (both && tH <= t10) return fail('하프 기록이 10K 기록보다 느려야 해요. 기록을 다시 확인해주세요.');
+      if (both && (tH < 50 * 60 || tH > 5 * 3600)) return fail('하프 기록을 다시 확인해주세요.');
+      err.hidden = true;
+
+      let k, kShown, tHalf, tFull, tag, note = '';
+      if (usePersonal) {
+        k = kPersonal;
+        kShown = k;
+        tHalf = tH;
+        tFull = tH * Math.pow(PD_DF / PD_DH, k + 0.01);
+        tag = k < 1.05 ? '지구력형' : k <= 1.08 ? '밸런스형' : '스피드형';
+        if (k > 1.18) note = '10K와 하프 기록의 차이가 큰 편이라 예측이 실제와 다를 수 있어요.';
+      } else if (both) {
+        // 예: 10K는 가볍게 뛰고 하프는 기록을 노린 경우 → 하프 기록이 더 믿을 만하다
+        k = parseFloat(document.getElementById('pd-type').value);
+        kShown = k;
+        tHalf = tH;
+        tFull = tH * Math.pow(PD_DF / PD_DH, k);
+        tag = k <= 1.06 ? '상급 러너 기준' : k <= 1.08 ? '일반 러너 기준' : '입문 러너 기준';
+        note = '두 기록의 페이스 차이가 평소와 달라서, 하프 기록과 러너 유형으로 계산했어요.';
+      } else {
+        k = parseFloat(document.getElementById('pd-type').value);
+        kShown = k;
+        tHalf = t10 * Math.pow(PD_DH / PD_D10, k);
+        tFull = t10 * Math.pow(PD_DF / PD_D10, k);
+        tag = k <= 1.06 ? '상급 러너 기준' : k <= 1.08 ? '일반 러너 기준' : '입문 러너 기준';
+      }
+
+      const SUBS = [[3, '서브3'], [3.5, '서브3:30'], [4, '서브4'], [4.5, '서브4:30'], [5, '서브5']];
+      const sub = SUBS.find(([h]) => tFull < h * 3600);
+      const p = pdPick('pb');
+      let compare = '';
+      if (p.full) {
+        const diff = Math.round(secOf(p.full) - tFull);
+        compare = diff > 60
+          ? `지금 풀코스 PB ${shortTime(p.full)}보다 <b>${pdFmtTime(diff)}</b> 더 빨리 들어올 수 있어요.`
+          : diff < -60 ? `풀코스 PB ${shortTime(p.full)}이 예측보다 빨라요. 풀코스에 강한 러너예요.`
+          : `풀코스 PB ${shortTime(p.full)}와 거의 같아요. 지금 실력 그대로예요.`;
+      }
+
+      const strat = [['안전 완주', tFull * 1.02, ''], ['목표', tFull, 'mid'], ['PB 도전', tFull * 0.98, '']];
+      const marks = [5, 10, 15, 20, PD_DH, 25, 30, 35, 40, PD_DF];
+      const pace = tFull / PD_DF;
+      const splits = marks.map((km, i) => {
+        const from = i ? marks[i - 1] : 0;
+        const label = km === PD_DH ? '하프' : km === PD_DF ? '완주' : `${km}km`;
+        return `<div class="pd-split ${km === PD_DH ? 'half' : ''}"><span>${label}</span><span class="num">${pdFmtTime((km - from) * pace)}</span><span class="num">${pdFmtTime(km * pace)}</span></div>`;
+      }).join('');
+
+      out.innerHTML = `
+        <div class="pd-hero">
+          <div class="pd-hero-label">예상 풀코스 기록</div>
+          <div class="pd-hero-time num">${pdFmtTime(tFull)}</div>
+          <div class="pd-hero-pace">목표 페이스 <b class="num">${pdFmtPace(tFull, PD_DF)}/km</b></div>
+          ${sub ? `<span class="pd-badge">${sub[1]} 가능권</span>` : ''}
+          ${compare ? `<div class="pd-compare">${compare}</div>` : ''}
+        </div>
+        <div class="pd-two">
+          <div class="pd-mini">
+            <div class="stat-label">${both ? '내 하프 기록' : '예상 하프 기록'}</div>
+            <div class="pd-mini-value num">${pdFmtTime(tHalf)}</div>
+            <div class="pd-mini-sub num">${pdFmtPace(tHalf, PD_DH)}/km</div>
+          </div>
+          <div class="pd-mini">
+            <div class="stat-label">피로 계수</div>
+            <div class="pd-mini-value num">k ${kShown.toFixed(3)}</div>
+            <div class="pd-mini-sub">${tag}</div>
+          </div>
+        </div>
+        ${note ? `<p class="note">${note}</p>` : ''}
+        <h3 class="section-title">레이스 전략</h3>
+        <div class="pd-strat">
+          ${strat.map(([l, t, c]) => `<div class="${c}"><div class="pd-strat-label">${l}</div><div class="pd-strat-time num">${pdFmtTime(t)}</div><div class="pd-strat-pace num">${pdFmtPace(t, PD_DF)}/km</div></div>`).join('')}
+        </div>
+        <h3 class="section-title">5km 구간 통과표</h3>
+        <div class="pd-splits">
+          <div class="pd-split head"><span>지점</span><span>구간</span><span>누적</span></div>
+          ${splits}
+        </div>
+        <p class="note">목표 기록을 같은 페이스로 달리는 기준이에요.</p>`;
+    }
 
     function openProfileMenu() { document.getElementById('profile-menu').style.display = 'flex'; }
     function closeProfileMenu() { document.getElementById('profile-menu').style.display = 'none'; }
@@ -2466,9 +2936,14 @@
     // ========================================================
     window.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("record-form").addEventListener("input", (e) => e.target.classList.remove("needs-check"));
+      document.querySelectorAll('.pd-in').forEach(el => el.addEventListener('input', onPredictorEdit));
+      document.getElementById('pd-type').addEventListener('change', calcRacePredictor);
       document.getElementById("cat-buttons-wrap").addEventListener("click", (e) => e.currentTarget.classList.remove("needs-check"));
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
+        if (document.getElementById('record-detail-modal').style.display === 'flex') { closeRecordDetail(); return; }
+        if (document.getElementById('predictor-modal').style.display === 'flex') { closeRacePredictor(); return; }
+        if (document.getElementById('follow-list-modal').style.display === 'flex') { closeFollowList(); return; }
         ['choice-modal', 'profile-menu', 'cert-viewer-modal', 'pb-share-modal'].forEach(id => { document.getElementById(id).style.display = 'none'; });
       });
       updateTopbar();
@@ -2750,6 +3225,8 @@
       }
       if (parsed.bib) document.getElementById("form-bib").value = parsed.bib;
       if (parsed.date) document.getElementById("form-date").value = parsed.date;
+      const notesEl = document.getElementById("form-notes");
+      if (parsed.courseNote && !notesEl.value.trim()) notesEl.value = parsed.courseNote;
       updateAutoPace();
 
       const weak = weakFields(parsed);
@@ -2759,7 +3236,10 @@
       const note = document.getElementById('ocr-check-note');
       if (note) {
         note.classList.toggle('ok', !weak.length && !parsed.status);
-        if (parsed.status) {
+        if (parsed.courseNote && parsed.courseNote.includes('완주 기록')) {
+          note.classList.remove('ok');
+          note.textContent = `${parsed.courseKm}km 코스라서 함께 적힌 10km 구간 기록을 10K 기록으로 넣었어요. 전체 기록은 후기 칸에 적어뒀어요.`;
+        } else if (parsed.status) {
           note.textContent = `이 기록증은 완주 기록 대신 '${parsed.status}'로 표시되어 있어요. 완주 기록이 있어야 저장할 수 있어요.`;
         } else if (weak.length) {
           note.textContent = `노란 칸(${weak.map(k => OCR_FIELD_LABEL[k]).join(', ')})은 확실하지 않아요. 사진과 비교해 확인해주세요.`;
@@ -2840,7 +3320,7 @@
             pace: parsed.pace,
             date: parsed.date || localTodayStr(),
             bib: parsed.bib || "",
-            notes: "",
+            notes: parsed.courseNote || "",
             cert_image_url: finalCertUrl
           });
           successCount++;
