@@ -762,6 +762,13 @@
     .pd-hero-pace b { color: var(--accent); font-weight: 700; }
     .pd-badge { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px; background: var(--accent); color: #FFFFFF; font-size: 13px; font-weight: 700; }
     .pd-compare { font-size: 13px; color: #8A2E12; margin-top: 10px; line-height: 1.5; }
+    .pd-km { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 0 16px; }
+    .pd-km button { height: 44px; border-radius: 12px; border: 1px solid var(--line-2); background: #FFFFFF; font-size: 14px; }
+    .pd-km button.active { background: var(--text); border-color: var(--text); color: #FFFFFF; font-weight: 700; }
+    .pd-real { margin: 10px 16px 0; padding: 16px; border-radius: 16px; background: var(--surface); }
+    .pd-real-time { font-size: 32px; font-weight: 800; letter-spacing: -0.6px; line-height: 1.2; }
+    .pd-real-row { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
+    .pd-advice { padding: 10px 16px 0; font-size: 13px; line-height: 1.6; color: var(--sub); }
     .pd-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 16px 0; }
     .pd-mini { background: var(--surface); border-radius: 14px; padding: 14px; min-width: 0; }
     .pd-mini-value { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; margin-top: 2px; }
@@ -1140,14 +1147,6 @@
               </div>
               <div class="pd-src" id="pd-hf-src"></div>
             </div>
-            <div class="fg" id="pd-type-group" style="margin-top: 14px;">
-              <label for="pd-type">러너 유형</label>
-              <select id="pd-type" class="pd-select">
-                <option value="1.06">상급 · 월 200km 이상, 장거리 훈련 충분</option>
-                <option value="1.075" selected>일반 · 월 100~150km</option>
-                <option value="1.10">입문 · 월 100km 미만, 첫 풀코스</option>
-              </select>
-            </div>
             <div class="pd-error" id="pd-error" role="alert" hidden></div>
           </div>
 
@@ -1156,14 +1155,17 @@
           <details class="pd-how">
             <summary>계산 방식 보기</summary>
             <div class="pd-how-body">
-              <p>육상계에서 널리 쓰는 피트 리겔(Pete Riegel) 공식으로 계산해요.</p>
-              <div class="pd-formula">T2 = T1 × (D2 ÷ D1)<sup>k</sup></div>
-              <p>k는 거리가 길어질수록 페이스가 떨어지는 정도(피로 계수)예요. 보통 1.06~1.08 사이예요.</p>
+              <p><b>잠재력 기록</b>은 육상계에서 널리 쓰는 피트 리겔(Pete Riegel) 공식으로 계산해요. 대부분의 기록 계산기와 같은 방식이에요.</p>
+              <div class="pd-formula">풀코스 = 기준 기록 × (42.195 ÷ 기준 거리)<sup>1.06</sup></div>
+              <p>기준 기록은 하프 기록이 있으면 하프, 없으면 10K예요. 풀코스와 거리가 가까운 기록일수록 정확해요. 10K만 있으면 같은 공식으로 하프도 예측할 수 있어요. 하프는 풀코스보다 주간 거리의 영향이 작아서 1km당 더하는 시간을 풀코스의 절반으로 잡아요.</p>
+              <p><b>현실 예상 기록</b>은 주간 달리기 거리를 반영해요. 동호인 러너 2,000여 명을 분석한 연구(Vickers &amp; Vertosick, 2016)에서 리겔 공식은 절반의 러너에게 풀코스를 10분 이상 빠르게 예측했고, 주간 거리를 함께 쓰면 오차가 크게 줄었어요. 그래서 주간 거리에 따라 1km당 시간을 더해요.</p>
               <ul>
-                <li><b>10K만 있을 때</b>: 고른 러너 유형의 k로 하프와 풀코스를 계산해요.</li>
-                <li><b>10K와 하프가 있을 때</b>: 두 기록으로 나만의 k를 구하고, 30km 이후 체력이 떨어지는 구간을 반영해 0.01을 더해 풀코스를 계산해요.</li>
+                <li>60km 이상: 그대로</li>
+                <li>40~60km: 1km당 15초</li>
+                <li>25~40km: 1km당 40초</li>
+                <li>25km 미만: 1km당 60초</li>
               </ul>
-              <p><b>k 해석</b>: 1.05 미만은 지구력형, 1.05~1.08은 밸런스형, 1.08 초과는 스피드형이에요.</p>
+              <p><b>러너 성향</b>은 10K와 하프 기록을 비교해서 거리가 늘 때 페이스가 얼마나 떨어지는지(k)로 판단해요. 1.05 미만은 지구력형, 1.05~1.08은 밸런스형, 1.08 초과는 스피드형이에요.</p>
               <p class="pd-disclaimer">예측은 참고용이에요. 실제 기록은 훈련량, 코스, 날씨, 컨디션에 따라 달라져요.</p>
             </div>
           </details>
@@ -1181,8 +1183,9 @@
       <button class="menu-item" onclick="closeProfileMenu(); openRacePredictor();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg>마라톤 기록 예측기</button>
       <div class="menu-divider"></div>
       <div class="menu-group" id="menu-group-settings">설정</div>
-      <button class="menu-item" onclick="closeProfileMenu(); openProfileModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>프로필 수정</button>
-      <button class="menu-item danger" onclick="closeProfileMenu(); handleAuthBtnClick();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></svg>로그아웃</button>
+      <button class="menu-item" id="menu-login" onclick="closeProfileMenu(); openAuthModal('login');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M14 16l4-4-4-4M18 12H8"/></svg>로그인 / 가입</button>
+      <button class="menu-item" id="menu-profile-edit" onclick="closeProfileMenu(); openProfileModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>프로필 수정</button>
+      <button class="menu-item danger" id="menu-logout" onclick="closeProfileMenu(); handleAuthBtnClick();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></svg>로그아웃</button>
       <button type="button" class="sheet-cancel" onclick="closeProfileMenu()">닫기</button>
     </div>
   </div>
@@ -1749,8 +1752,9 @@
       else if (currentMainView === 'ranking') title.textContent = '랭킹';
       else if (currentMainView === 'runners') title.textContent = '러너 찾기';
       else title.textContent = (currentUser && currentProfile && currentProfile.nickname) || '내 기록실';
-      document.getElementById('topbar-search').hidden = !isFeed;
-      document.getElementById('topbar-menu').hidden = !(currentMainView === 'profile' && currentUser);
+      // 세 줄 메뉴는 모든 탭에 (돋보기는 하단 '러너 찾기' 탭과 같아서 뺀다)
+      document.getElementById('topbar-search').hidden = true;
+      document.getElementById('topbar-menu').hidden = false;
       document.getElementById('topbar-login').hidden = Boolean(currentUser);
     }
 
@@ -2443,9 +2447,8 @@
         const p = pdPick(src);
         pdSetTime('10', p.k10);
         pdSetTime('hf', p.half);
-        const label = src === 'pb' ? 'PB' : '최근 기록';
-        document.getElementById('pd-10-src').innerHTML = pdSrcLine(p.k10, `${label}으로 쓸 10K 기록이 없어요. 직접 입력해주세요.`.replace('PB으로', 'PB로'));
-        document.getElementById('pd-hf-src').innerHTML = pdSrcLine(p.half, '하프 기록이 없어서 러너 유형으로 계산해요.');
+        document.getElementById('pd-10-src').innerHTML = pdSrcLine(p.k10, '10K 기록이 없어요.');
+        document.getElementById('pd-hf-src').innerHTML = pdSrcLine(p.half, '하프 기록이 없어서 10K 기록으로 계산해요.');
       } else {
         document.getElementById('pd-10-src').textContent = '';
         document.getElementById('pd-hf-src').textContent = '';
@@ -2467,103 +2470,147 @@
       calcRacePredictor();
     }
 
+    // 주간 달리기 거리 → 1km당 더하는 시간(초)
+    const PD_KM_OPTIONS = [
+      { id: 'lt25', label: '25km 미만', add: 60 },
+      { id: '25to40', label: '25~40km', add: 40 },
+      { id: '40to60', label: '40~60km', add: 15 },
+      { id: 'gt60', label: '60km 이상', add: 0 }
+    ];
+    let pdWeekly = '25to40';
+    try { const v = localStorage.getItem('pbpb_weekly_km'); if (PD_KM_OPTIONS.some(o => o.id === v)) pdWeekly = v; } catch (e) {}
+    let pdTarget = 'full';   // 10K만 있을 때 'full' | 'half'
+    function setPredictorTarget(t) { pdTarget = t; calcRacePredictor(); }
+    function setPredictorWeekly(id) {
+      pdWeekly = id;
+      try { localStorage.setItem('pbpb_weekly_km', id); } catch (e) {}
+      calcRacePredictor();
+    }
+
     function calcRacePredictor() {
       const out = document.getElementById('pd-result');
       const err = document.getElementById('pd-error');
       const t10 = pdGetSec('10'), tH = pdGetSec('hf');
-      const both = tH > 0;
-      // 두 기록으로 구한 계수가 비현실적이면(1.0 미만/1.25 초과) 하프 기록 + 러너 유형으로 계산
-      const kPersonal = (both && t10 > 0 && tH > t10) ? Math.log(tH / t10) / Math.log(PD_DH / PD_D10) : null;
-      const usePersonal = kPersonal != null && kPersonal >= 1.0 && kPersonal <= 1.25;
-      document.getElementById('pd-type-group').hidden = usePersonal;
-      document.getElementById('pd-hf-clear').hidden = !both;
-      const fail = (msg) => { err.textContent = msg; err.hidden = !msg; out.innerHTML = msg ? '' : `<div class="empty" style="padding: 32px 24px;"><p>10K 기록을 넣으면 풀코스 기록을 예측해요.</p></div>`; };
+      document.getElementById('pd-hf-clear').hidden = !tH;
+      const fail = (msg) => { err.textContent = msg; err.hidden = !msg; out.innerHTML = msg ? '' : `<div class="empty" style="padding: 32px 24px;"><p>10K나 하프 기록을 넣으면 풀코스 기록을 예측해요.</p></div>`; };
 
-      if (!t10) return fail('');
-      if (t10 < 25 * 60 || t10 > 2.5 * 3600) return fail('10K 기록을 다시 확인해주세요.');
-      if (both && tH <= t10) return fail('하프 기록이 10K 기록보다 느려야 해요. 기록을 다시 확인해주세요.');
-      if (both && (tH < 50 * 60 || tH > 5 * 3600)) return fail('하프 기록을 다시 확인해주세요.');
+      if (!tH && document.getElementById('pd-hf-src').dataset.pred) { document.getElementById('pd-hf-src').innerHTML = ''; document.getElementById('pd-hf-src').dataset.pred = ''; }
+      if (!t10 && !tH) return fail('');
+      if (t10 && (t10 < 25 * 60 || t10 > 2.5 * 3600)) return fail('10K 기록을 다시 확인해주세요.');
+      if (tH && (tH < 50 * 60 || tH > 5 * 3600)) return fail('하프 기록을 다시 확인해주세요.');
+      if (t10 && tH && tH <= t10) return fail('하프 기록이 10K 기록보다 느려야 해요. 기록을 다시 확인해주세요.');
       err.hidden = true;
 
-      let k, kShown, tHalf, tFull, tag, note = '';
-      if (usePersonal) {
-        k = kPersonal;
-        kShown = k;
-        tHalf = tH;
-        tFull = tH * Math.pow(PD_DF / PD_DH, k + 0.01);
-        tag = k < 1.05 ? '지구력형' : k <= 1.08 ? '밸런스형' : '스피드형';
-        if (k > 1.18) note = '10K와 하프 기록의 차이가 큰 편이라 예측이 실제와 다를 수 있어요.';
-      } else if (both) {
-        // 예: 10K는 가볍게 뛰고 하프는 기록을 노린 경우 → 하프 기록이 더 믿을 만하다
-        k = parseFloat(document.getElementById('pd-type').value);
-        kShown = k;
-        tHalf = tH;
-        tFull = tH * Math.pow(PD_DF / PD_DH, k);
-        tag = k <= 1.06 ? '상급 러너 기준' : k <= 1.08 ? '일반 러너 기준' : '입문 러너 기준';
-        note = '두 기록의 페이스 차이가 평소와 달라서, 하프 기록과 러너 유형으로 계산했어요.';
-      } else {
-        k = parseFloat(document.getElementById('pd-type').value);
-        kShown = k;
-        tHalf = t10 * Math.pow(PD_DH / PD_D10, k);
-        tFull = t10 * Math.pow(PD_DF / PD_D10, k);
-        tag = k <= 1.06 ? '상급 러너 기준' : k <= 1.08 ? '일반 러너 기준' : '입문 러너 기준';
+      // 1) 잠재력: 풀코스와 가까운 기록(하프 우선) × 리겔 1.06
+      const K = 1.06;
+      const useHalf = tH > 0;
+      const base = useHalf ? tH : t10;
+      const baseKm = useHalf ? PD_DH : PD_D10;
+      const tPot = base * Math.pow(PD_DF / baseKm, K);
+      // 2) 현실: 주간 거리 가산
+      const opt = PD_KM_OPTIONS.find(o => o.id === pdWeekly) || PD_KM_OPTIONS[1];
+      const tReal = tPot + opt.add * PD_DF;
+      // 10K만 있을 때: 예상 하프 (리겔 공식은 하프까지는 잘 맞는다는 연구 결과 → 주간 거리 가산 없이)
+      const tHalfPred = useHalf ? 0 : t10 * Math.pow(PD_DH / PD_D10, K);
+      const hfSrc = document.getElementById('pd-hf-src');
+      if (tHalfPred) {
+        hfSrc.innerHTML = `예상 하프 <b class="num">${pdFmtTime(tHalfPred)}</b> · ${pdFmtPace(tHalfPred, PD_DH)}/km <span style="color: var(--muted);">(10K 기록으로 계산)</span>`;
+      } else if (hfSrc.dataset.pred) {
+        hfSrc.innerHTML = '';
+      }
+      hfSrc.dataset.pred = tHalfPred ? '1' : '';
+      // 3) 성향: 10K·하프가 모두 있을 때만 (계산에는 쓰지 않음)
+      let style = null;
+      if (t10 && tH) {
+        const k = Math.log(tH / t10) / Math.log(PD_DH / PD_D10);
+        if (k >= 0.95 && k <= 1.3) {
+          style = k < 1.05
+            ? { tag: '지구력형', k, advice: '거리가 늘어도 페이스를 잘 지키는 편이에요. 스피드 훈련을 더하면 기록이 더 좋아질 수 있어요.' }
+            : k <= 1.08
+            ? { tag: '밸런스형', k, advice: '스피드와 지구력이 고르게 갖춰져 있어요.' }
+            : { tag: '스피드형', k, advice: '10K에 비해 하프에서 페이스가 많이 떨어지는 편이에요. 장거리 훈련을 늘리면 잠재력 기록에 더 가까워져요.' };
+        }
       }
 
-      const SUBS = [[3, '서브3'], [3.5, '서브3:30'], [4, '서브4'], [4.5, '서브4:30'], [5, '서브5']];
-      const sub = SUBS.find(([h]) => tFull < h * 3600);
-      const p = pdPick('pb');
-      let compare = '';
-      if (p.full) {
-        const diff = Math.round(secOf(p.full) - tFull);
-        compare = diff > 60
-          ? `지금 풀코스 PB ${shortTime(p.full)}보다 <b>${pdFmtTime(diff)}</b> 더 빨리 들어올 수 있어요.`
-          : diff < -60 ? `풀코스 PB ${shortTime(p.full)}이 예측보다 빨라요. 풀코스에 강한 러너예요.`
-          : `풀코스 PB ${shortTime(p.full)}와 거의 같아요. 지금 실력 그대로예요.`;
-      }
+      // 분석 대상: 하프 기록이 없으면 풀코스/하프 중 선택, 있으면 풀코스
+      const isHalfT = !useHalf && pdTarget === 'half';
+      const T = isHalfT
+        ? { name: '하프', D: PD_DH, pot: tHalfPred, add: Math.round(opt.add / 2),
+            subs: [[1.5, '서브1:30'], [1.75, '서브1:45'], [2, '서브2'], [2.25, '서브2:15'], [2.5, '서브2:30']],
+            marks: [5, 10, 15, 20, PD_DH], pb: (computeBest(records).Half || {}).rec || null }
+        : { name: '풀코스', D: PD_DF, pot: tPot, add: opt.add,
+            subs: [[3, '서브3'], [3.5, '서브3:30'], [4, '서브4'], [4.5, '서브4:30'], [5, '서브5']],
+            marks: [5, 10, 15, 20, PD_DH, 25, 30, 35, 40, PD_DF], pb: pdPick('pb').full };
+      T.real = T.pot + T.add * T.D;
+      const sub = T.subs.find(([h]) => T.pot < h * 3600);
+      const pb = T.pb;
+      const baseLabel = useHalf ? `하프 ${pdFmtTime(tH)}` : `10K ${pdFmtTime(t10)}`;
 
-      const strat = [['안전 완주', tFull * 1.02, ''], ['목표', tFull, 'mid'], ['PB 도전', tFull * 0.98, '']];
-      const marks = [5, 10, 15, 20, PD_DH, 25, 30, 35, 40, PD_DF];
-      const pace = tFull / PD_DF;
-      const splits = marks.map((km, i) => {
-        const from = i ? marks[i - 1] : 0;
-        const label = km === PD_DH ? '하프' : km === PD_DF ? '완주' : `${km}km`;
-        return `<div class="pd-split ${km === PD_DH ? 'half' : ''}"><span>${label}</span><span class="num">${pdFmtTime((km - from) * pace)}</span><span class="num">${pdFmtTime(km * pace)}</span></div>`;
+      const strat = [['안전 완주', T.real * 1.02, ''], ['목표', T.real, 'mid'], ['PB 도전', T.real * 0.98, '']];
+      const pace = T.real / T.D;
+      const splits = T.marks.map((km, i) => {
+        const from = i ? T.marks[i - 1] : 0;
+        const label = km === T.D ? '완주' : km === PD_DH ? '하프' : `${km}km`;
+        return `<div class="pd-split ${km === PD_DH && km !== T.D ? 'half' : ''}"><span>${label}</span><span class="num">${pdFmtTime((km - from) * pace)}</span><span class="num">${pdFmtTime(km * pace)}</span></div>`;
       }).join('');
+      const targetSeg = useHalf ? '' : `
+        <div class="seg" role="tablist" aria-label="예측할 거리" style="margin-top: 16px;">
+          <button class="seg-btn ${isHalfT ? '' : 'active'}" role="tab" aria-selected="${!isHalfT}" onclick="setPredictorTarget('full')">풀코스 예측</button>
+          <button class="seg-btn ${isHalfT ? 'active' : ''}" role="tab" aria-selected="${isHalfT}" onclick="setPredictorTarget('half')">하프 예측</button>
+        </div>`;
 
-      out.innerHTML = `
+      out.innerHTML = `${targetSeg}
         <div class="pd-hero">
-          <div class="pd-hero-label">예상 풀코스 기록</div>
-          <div class="pd-hero-time num">${pdFmtTime(tFull)}</div>
-          <div class="pd-hero-pace">목표 페이스 <b class="num">${pdFmtPace(tFull, PD_DF)}/km</b></div>
+          <div class="pd-hero-label">${isHalfT ? '하프 ' : ''}잠재력 기록 <span style="font-weight:400;">· ${baseLabel} 기준</span></div>
+          <div class="pd-hero-time num">${pdFmtTime(T.pot)}</div>
+          <div class="pd-hero-pace">페이스 <b class="num">${pdFmtPace(T.pot, T.D)}/km</b></div>
           ${sub ? `<span class="pd-badge">${sub[1]} 가능권</span>` : ''}
-          ${compare ? `<div class="pd-compare">${compare}</div>` : ''}
+          <div class="pd-compare">훈련이 충분할 때 낼 수 있는 기록이에요</div>
         </div>
+
+        <h3 class="section-title">요즘 일주일에 몇 km 달리세요?</h3>
+        <div class="pd-km" role="radiogroup" aria-label="주간 달리기 거리">
+          ${PD_KM_OPTIONS.map(o => `<button type="button" role="radio" aria-checked="${o.id === opt.id}" class="${o.id === opt.id ? 'active' : ''}" onclick="setPredictorWeekly('${o.id}')">${o.label}</button>`).join('')}
+        </div>
+        <div class="pd-real">
+          <div class="stat-label">${isHalfT ? '하프 ' : ''}현실 예상 기록</div>
+          <div class="pd-real-row"><span class="pd-real-time num">${pdFmtTime(T.real)}</span><span class="stat-label num">${pdFmtPace(T.real, T.D)}/km</span></div>
+          <div class="pd-mini-sub">${T.add ? `주간 거리 기준 1km당 ${T.add}초를 더했어요${isHalfT ? ' (하프는 풀코스의 절반)' : ''}` : '잠재력 기록 그대로예요'}</div>
+        </div>
+
         <div class="pd-two">
           <div class="pd-mini">
-            <div class="stat-label">${both ? '내 하프 기록' : '예상 하프 기록'}</div>
-            <div class="pd-mini-value num">${pdFmtTime(tHalf)}</div>
-            <div class="pd-mini-sub num">${pdFmtPace(tHalf, PD_DH)}/km</div>
+            <div class="stat-label">내 ${T.name} PB</div>
+            <div class="pd-mini-value num">${pb ? shortTime(pb) : '-'}</div>
+            <div class="pd-mini-sub" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${pb ? esc(pb.name) : '아직 기록이 없어요'}</div>
           </div>
           <div class="pd-mini">
-            <div class="stat-label">피로 계수</div>
-            <div class="pd-mini-value num">k ${kShown.toFixed(3)}</div>
-            <div class="pd-mini-sub">${tag}</div>
+            <div class="stat-label">러너 성향</div>
+            <div class="pd-mini-value">${style ? style.tag : '-'}</div>
+            <div class="pd-mini-sub num">${style ? `10K→하프 계수 ${style.k.toFixed(3)}` : '10K·하프 기록이 모두 있어야 알 수 있어요'}</div>
           </div>
         </div>
-        ${note ? `<p class="note">${note}</p>` : ''}
-        <h3 class="section-title">레이스 전략</h3>
+        ${style ? `<p class="pd-advice">${style.advice}</p>` : ''}
+
+        <h3 class="section-title">레이스 전략 <span style="font-size:12px; color: var(--sub); font-weight:400;">현실 예상 기록 기준</span></h3>
         <div class="pd-strat">
-          ${strat.map(([l, t, c]) => `<div class="${c}"><div class="pd-strat-label">${l}</div><div class="pd-strat-time num">${pdFmtTime(t)}</div><div class="pd-strat-pace num">${pdFmtPace(t, PD_DF)}/km</div></div>`).join('')}
+          ${strat.map(([l, t, c]) => `<div class="${c}"><div class="pd-strat-label">${l}</div><div class="pd-strat-time num">${pdFmtTime(t)}</div><div class="pd-strat-pace num">${pdFmtPace(t, T.D)}/km</div></div>`).join('')}
         </div>
         <h3 class="section-title">5km 구간 통과표</h3>
         <div class="pd-splits">
           <div class="pd-split head"><span>지점</span><span>구간</span><span>누적</span></div>
           ${splits}
         </div>
-        <p class="note">목표 기록을 같은 페이스로 달리는 기준이에요.</p>`;
+        <p class="note">현실 예상 기록을 같은 페이스로 달리는 기준이에요.</p>`;
     }
 
-    function openProfileMenu() { document.getElementById('profile-menu').style.display = 'flex'; }
+    function openProfileMenu() {
+      const loggedIn = Boolean(currentUser);
+      document.getElementById('menu-login').hidden = loggedIn;
+      document.getElementById('menu-profile-edit').hidden = !loggedIn;
+      document.getElementById('menu-logout').hidden = !loggedIn;
+      document.getElementById('profile-menu').style.display = 'flex';
+    }
     function closeProfileMenu() { document.getElementById('profile-menu').style.display = 'none'; }
 
     // ========================================================
@@ -2937,7 +2984,6 @@
     window.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("record-form").addEventListener("input", (e) => e.target.classList.remove("needs-check"));
       document.querySelectorAll('.pd-in').forEach(el => el.addEventListener('input', onPredictorEdit));
-      document.getElementById('pd-type').addEventListener('change', calcRacePredictor);
       document.getElementById("cat-buttons-wrap").addEventListener("click", (e) => e.currentTarget.classList.remove("needs-check"));
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
