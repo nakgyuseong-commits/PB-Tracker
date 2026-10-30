@@ -1048,7 +1048,7 @@
             <span class="fg-label">대회 사진 <span class="pd-optional" id="photo-count">0/5</span></span>
             <div class="pstrip" id="photo-strip"></div>
             <input type="file" id="photo-input" accept="image/*" multiple hidden onchange="handlePhotoPick(this)">
-            <p class="photo-note">첫 장이 피드 대표 사진이 돼요. 다른 러너가 나온 사진은 주의해주시고, 유료 공식 사진은 촬영 업체의 이용 조건을 확인해주세요.</p>
+            <p class="photo-note">피드에는 기록증이 먼저 보이고, 사진은 그다음에 순서대로 나와요. 기록증이 없으면 첫 장이 대표 사진이 돼요. 다른 러너가 나온 사진은 주의해주시고, 유료 공식 사진은 촬영 업체의 이용 조건을 확인해주세요.</p>
           </div>
 
           <div id="ocr-check-note" class="ocr-check-note" style="display:none;"></div>
@@ -1561,6 +1561,7 @@
           .from('certificates')
           .getPublicUrl(fileName);
 
+        if (pubData && pubData.publicUrl) await uploadCertThumb(pubData.publicUrl, owner, dataUrl);   // 그리드용 작은 미리보기
         return pubData ? pubData.publicUrl : null;
       } catch (err) {
         console.error("Storage upload exception:", err);
@@ -2416,7 +2417,7 @@
           const action = isSelf ? `openEditModal(${jsArg(r.id)})` : `openRecordDetail(${jsArg(r.id)})`;
           return `
             <button class="tile" ${action ? `onclick="${action}"` : 'disabled'} aria-label="${esc(r.name)} ${shortTime(r)}">
-              ${isSafeUrl(r.certImageUrl) ? `<img src="${safeUrl(r.certImageUrl)}" alt="" loading="lazy">` : `<span class="tile-text">${esc(r.name)}</span>`}
+              ${isSafeUrl(r.certImageUrl) ? `<img src="${safeUrl(certThumbUrl(r.certImageUrl, isSelf ? (currentUser && currentUser.id) : r.userId))}" data-full="${safeUrl(r.certImageUrl)}" ${isSelf ? 'data-own="1"' : ''} onerror="certThumbFallback(this)" alt="" loading="lazy" decoding="async">` : `<span class="tile-text">${esc(r.name)}</span>`}
               <span class="tile-label num">${CAT_SHORT[bucket] || esc(r.category || '')} ${shortTime(r)}</span>
               ${(recordPhotos.get(r.id) || []).length ? `<span class="tile-multi" aria-label="사진 ${(recordPhotos.get(r.id) || []).length}장">${ICON_MULTI}</span>` : ''}
             </button>`;
@@ -3474,11 +3475,58 @@
       if (photos.length) await supabaseClient.storage.from(PHOTO_BUCKET).remove(photos.flatMap(p => [p.path, p.thumb_path])).catch(() => {});
       recordPhotos.delete(recId);
       const m = String(certUrl || '').match(/\/storage\/v1\/object\/public\/certificates\/(.+)$/);
-      if (m) await supabaseClient.storage.from('certificates').remove([decodeURIComponent(m[1])]).catch(() => {});
+      const thumb = certThumbPath(certUrl, currentUser && currentUser.id);
+      if (m) await supabaseClient.storage.from('certificates').remove([decodeURIComponent(m[1]), ...(thumb ? [thumb] : [])]).catch(() => {});
     }
 
+    // ---------- 기록증 작은 미리보기 (그리드용, 전송량 절약) ----------
+    // 경로 규칙: certificates/{주인 id}/thumbs/{원본 파일 이름}_t.jpg  → 원본 주소만 알면 바로 계산된다
+    function certThumbPath(url, uid) {
+      const m = String(url || '').match(/\/storage\/v1\/object\/public\/certificates\/([^?#]+)/);
+      if (!m || !uid) return null;
+      const name = decodeURIComponent(m[1]).split('/').pop().replace(/\.[a-z0-9]+$/i, '');
+      return name ? `${uid}/thumbs/${name}_t.jpg` : null;
+    }
+    function certThumbUrl(url, uid) {
+      const p = certThumbPath(url, uid);
+      return p && supabaseClient ? supabaseClient.storage.from('certificates').getPublicUrl(p).data.publicUrl : url;
+    }
+    async function makeCertThumbBlob(src) {
+      const blob = typeof src === 'string' ? dataURLtoBlob(src) : src;
+      const img = await decodeImage(blob);
+      try {
+        const s = Math.min(1, 480 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * s)); c.height = Math.max(1, Math.round(img.height * s));
+        const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, c.width, c.height);
+        return await new Promise(res => c.toBlob(res, 'image/jpeg', 0.8));
+      } finally { if (img.close) img.close(); }
+    }
+    async function uploadCertThumb(url, uid, src) {
+      const p = certThumbPath(url, uid);
+      if (!p || !supabaseClient) return false;
+      try {
+        const blob = await makeCertThumbBlob(src);
+        if (!blob) return false;
+        const { error } = await supabaseClient.storage.from('certificates').upload(p, blob, { contentType: 'image/jpeg', upsert: true });
+        return !error;
+      } catch (e) { return false; }
+    }
+    // 미리보기가 아직 없는 예전 기록증: 원본으로 보여주고, 내 기록이면 미리보기를 만들어 둔다
+    const certThumbTried = new Set();
+    function certThumbFallback(img) {
+      const full = img.dataset.full;
+      img.onerror = null;
+      if (full && img.src !== full) img.src = full;
+      if (img.dataset.own === '1' && currentUser && full && !certThumbTried.has(full)) {
+        certThumbTried.add(full);
+        fetch(full).then(r => (r.ok ? r.blob() : null)).then(b => b && uploadCertThumb(full, currentUser.id, b)).catch(() => {});
+      }
+    }
+
+
     // ---------- 보기: 피드 슬라이드 + 전체 화면 ----------
-    // 순서: 대표 사진 → 나머지 사진 → 기록증
+    // 순서: 기록증 → 대표 사진 → 나머지 사진
     function findRecordAny(recId) {
       const raw = feedRecords.find(r => r.id === recId) || (otherRunner && (otherRunner.rows || []).find(r => r.id === recId));
       if (raw) return normRec(raw);
@@ -3486,8 +3534,9 @@
       return mine ? { ...mine, userId: currentUser ? currentUser.id : null } : null;
     }
     function slidesFor(r) {
+      // 기록증이 있으면 항상 첫 장, 대회 사진은 그 뒤에 순서대로
       const list = (recordPhotos.get(r.id) || []).map(p => ({ type: 'photo', thumb: photoUrl(p.thumb_path), full: photoUrl(p.path) }));
-      if (isSafeUrl(r.certImageUrl)) list.push({ type: 'cert', thumb: r.certImageUrl, full: r.certImageUrl });
+      if (isSafeUrl(r.certImageUrl)) list.unshift({ type: 'cert', thumb: r.certImageUrl, full: r.certImageUrl });
       return list;
     }
     function mediaHtml(r, isPb) {
@@ -3499,7 +3548,7 @@
           <div class="carousel" ${n > 1 ? 'onscroll="onCarouselScroll(this)"' : ''}>
             ${slides.map((s, i) => `
               <button class="slide ${s.type}" onclick="openPhotoViewer(${jsArg(r.id)}, ${i})" aria-label="${s.type === 'cert' ? '기록증' : `대회 사진 ${i + 1}`} 크게 보기">
-                <img src="${safeUrl(s.full)}" alt="${esc(r.name)} ${s.type === 'cert' ? '기록증' : '대회 사진'}" loading="${i === 0 ? 'eager' : 'lazy'}" decoding="async">
+                <img src="${safeUrl(s.full)}" alt="${esc(r.name)} ${s.type === 'cert' ? '기록증' : '대회 사진'}" loading="lazy" decoding="async">
                 ${s.type === 'cert' && n > 1 ? '<span class="slide-tag">기록증</span>' : ''}
               </button>`).join('')}
           </div>
