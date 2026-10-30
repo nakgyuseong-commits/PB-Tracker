@@ -3143,7 +3143,7 @@
     async function preparePhoto(file) {
       const img = await decodeImage(file);
       try {
-        const full = await makeVariant(img, 1440, 0.82);
+        const full = await makeVariant(img, 1600, 0.86);
         const thumb = await makeVariant(img, 480, 0.75);
         return { full, thumb };
       } finally { if (img.close) img.close(); }
@@ -3300,7 +3300,7 @@
           <div class="carousel" ${n > 1 ? 'onscroll="onCarouselScroll(this)"' : ''}>
             ${slides.map((s, i) => `
               <button class="slide ${s.type}" onclick="openPhotoViewer(${jsArg(r.id)}, ${i})" aria-label="${s.type === 'cert' ? '기록증' : `대회 사진 ${i + 1}`} 크게 보기">
-                <img src="${safeUrl(s.thumb)}" alt="${esc(r.name)} ${s.type === 'cert' ? '기록증' : '대회 사진'}" loading="lazy">
+                <img src="${safeUrl(s.full)}" alt="${esc(r.name)} ${s.type === 'cert' ? '기록증' : '대회 사진'}" loading="${i === 0 ? 'eager' : 'lazy'}" decoding="async">
                 ${s.type === 'cert' && n > 1 ? '<span class="slide-tag">기록증</span>' : ''}
               </button>`).join('')}
           </div>
