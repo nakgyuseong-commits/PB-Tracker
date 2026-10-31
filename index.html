@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FFFFFF">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="PBPB">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>PBPB · Personal Best Pace Book</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -888,6 +895,20 @@
     .tr-g b { font-size: 15px; }
     .tr-g p { font-size: 13.5px; line-height: 1.65; margin-top: 6px; }
     .tr-g .tr-tip { font-size: 12.5px; color: var(--sub); padding-left: 10px; border-left: 2px solid var(--line-2); }
+    /* 알림 · 설치 */
+    .nt-status { background: var(--surface); border-radius: 14px; padding: 14px 16px; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .nt-status b { font-size: 15px; }
+    .nt-status b.on { color: var(--accent); }
+    .nt-status span { font-size: 13px; color: var(--sub); line-height: 1.5; }
+    .nt-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .link-btn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 700; font-size: inherit; text-decoration: underline; }
+    .ig-head { display: flex; align-items: center; gap: 12px; padding: 4px 4px 12px; }
+    .ig-head img { border-radius: 12px; }
+    .ig-steps { margin: 0 4px; padding: 14px 16px 14px 34px; background: var(--surface); border-radius: 14px; font-size: 14.5px; line-height: 1.7; }
+    .ig-steps li + li { margin-top: 4px; }
+    .ig-note, #install-guide-body > p { font-size: 13px; color: var(--sub); line-height: 1.6; padding: 10px 6px 0; }
+    .pb-share-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .pb-share-btns .btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
     .pd-how { margin: 20px 16px 0; border-radius: 14px; background: var(--surface); }
     .pd-how summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
     .pd-how summary::-webkit-details-marker { display: none; }
@@ -1115,7 +1136,10 @@
       </div>
       <div class="canvas-wrap"><canvas id="pbCanvas"></canvas></div>
       <div style="font-size:13px; color: var(--sub); margin-bottom:14px;">인스타그램 피드 크기(1080×1080)예요</div>
-      <button class="btn btn-accent btn-block" onclick="downloadPbCard()">이미지 저장</button>
+      <div class="pb-share-btns">
+        <button class="btn btn-accent" id="pb-share-btn" onclick="sharePbCard()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>공유하기</button>
+        <button class="btn btn-soft" onclick="downloadPbCard()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>이미지 저장</button>
+      </div>
     </div>
   </div>
 
@@ -1406,6 +1430,16 @@
     </div>
   </div>
 
+  <!-- 앱 설치 안내 -->
+  <div id="install-guide" class="overlay bottom" style="display:none; z-index:97;" onclick="if(event.target===this)closeInstallGuide()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ig-title">
+      <div class="sheet-grip"></div>
+      <div class="ig-head"><img src="icon-192.png" alt="" width="52" height="52"><div><div class="sheet-title" id="ig-title" style="padding:0;">홈 화면에 PBPB 설치</div><div class="sheet-sub" style="padding:2px 0 0;">주소창 없이 앱처럼 바로 열려요</div></div></div>
+      <div id="install-guide-body"></div>
+      <button type="button" class="sheet-cancel" onclick="closeInstallGuide()">닫기</button>
+    </div>
+  </div>
+
   <!-- 내 프로필 메뉴 -->
   <div id="profile-menu" class="overlay bottom" style="display:none;" onclick="if(event.target===this)closeProfileMenu()">
     <div class="sheet" role="dialog" aria-modal="true" aria-label="메뉴">
@@ -1416,6 +1450,7 @@
       <button class="menu-item" onclick="closeProfileMenu(); openTrainingGuide();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18l4-6 4 3 4-7 4 5"/><path d="M4 21h16"/></svg>훈련 페이스 가이드</button>
       <div class="menu-divider"></div>
       <div class="menu-group" id="menu-group-settings">설정</div>
+      <button class="menu-item" id="menu-install" onclick="closeProfileMenu(); installApp();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>홈 화면에 앱 설치</button>
       <button class="menu-item" id="menu-login" onclick="closeProfileMenu(); openAuthModal('login');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M14 16l4-4-4-4M18 12H8"/></svg>로그인 / 가입</button>
       <button class="menu-item" id="menu-profile-edit" onclick="closeProfileMenu(); openProfileModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>프로필 수정</button>
       <button class="menu-item danger" id="menu-logout" onclick="closeProfileMenu(); handleAuthBtnClick();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></svg>로그아웃</button>
@@ -2868,6 +2903,7 @@
       document.getElementById('menu-login').hidden = loggedIn;
       document.getElementById('menu-profile-edit').hidden = !loggedIn;
       document.getElementById('menu-logout').hidden = !loggedIn;
+      document.getElementById('menu-install').hidden = isStandalone();
       document.getElementById('profile-menu').style.display = 'flex';
     }
     function closeProfileMenu() { document.getElementById('profile-menu').style.display = 'none'; }
@@ -4012,6 +4048,71 @@
     }
 
     // ========================================================
+    // 앱 설치 (홈 화면에 추가)
+    // ========================================================
+    let deferredInstall = null;
+    function isStandalone() { return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
+    function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+    function isSecureHost() { return location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname); }
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; });
+    window.addEventListener('appinstalled', () => { deferredInstall = null; });
+
+    function installApp() {
+      if (deferredInstall) { const p = deferredInstall; deferredInstall = null; p.prompt(); return; }
+      openInstallGuide();
+    }
+    function openInstallGuide() {
+      const body = document.getElementById('install-guide-body');
+      if (!isSecureHost()) {
+        body.innerHTML = '<p>지금은 파일로 연 상태라 설치할 수 없어요. PBPB 사이트 주소(https://…)로 접속한 뒤 다시 시도해주세요.</p>';
+      } else if (isIOS()) {
+        body.innerHTML = `
+          <ol class="ig-steps">
+            <li>사파리 아래쪽의 <b>공유 버튼</b>(네모에서 화살표가 나오는 모양)을 눌러요</li>
+            <li>목록을 내려서 <b>홈 화면에 추가</b>를 눌러요</li>
+            <li>오른쪽 위 <b>추가</b>를 누르면 홈 화면에 PBPB 아이콘이 생겨요</li>
+          </ol>`;
+      } else {
+        body.innerHTML = `
+          <ol class="ig-steps">
+            <li>크롬 오른쪽 위 <b>⋮ 메뉴</b>를 눌러요</li>
+            <li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 눌러요</li>
+            <li><b>설치</b>를 누르면 홈 화면에 PBPB가 생겨요</li>
+          </ol>`;
+      }
+      document.getElementById('install-guide').style.display = 'flex';
+    }
+    function closeInstallGuide() { document.getElementById('install-guide').style.display = 'none'; }
+
+    // ---------- PB 카드 바로 공유 (카카오톡 · 메시지 · 인스타그램 등 폰 공유 창) ----------
+    async function sharePbCard() {
+      const cvs = document.getElementById('pbCanvas');
+      const btn = document.getElementById('pb-share-btn');
+      btn.disabled = true;
+      try {
+        const blob = await new Promise(res => cvs.toBlob(res, 'image/png'));
+        const file = blob && new File([blob], `PBPB_PB카드_${localTodayStr()}.png`, { type: 'image/png' });
+        const link = location.protocol === 'https:' ? location.origin + location.pathname : '';
+        const text = `PBPB로 정리한 내 PB 🏃${link ? '\n' + link : ''}`;
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: '내 PB 카드', text });
+        } else if (navigator.share && link) {
+          // 이미지 공유를 못 하는 브라우저: 이미지는 저장하고 링크만 공유
+          downloadPbCard();
+          await navigator.share({ title: '내 PB 카드', text });
+        } else {
+          downloadPbCard();
+          alert('이 브라우저에서는 바로 공유할 수 없어서 이미지로 저장했어요. 갤러리에서 공유해주세요.');
+        }
+      } catch (e) {
+        if (!e || e.name !== 'AbortError') {
+          console.warn('share:', e);
+          alert('공유하지 못했어요. [이미지 저장] 후 갤러리에서 공유해주세요.');
+        }
+      } finally { btn.disabled = false; }
+    }
+
+    // ========================================================
     // 시작
     // ========================================================
     window.addEventListener("DOMContentLoaded", async () => {
@@ -4021,6 +4122,7 @@
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
         if (document.getElementById('photo-viewer').style.display === 'flex') { closePhotoViewer(); return; }
+        if (document.getElementById('install-guide').style.display === 'flex') { closeInstallGuide(); return; }
         if (document.getElementById('goal-celebrate').style.display === 'flex') { closeGoalCelebrate(); return; }
         if (document.getElementById('goal-modal').style.display === 'flex') { closeGoalModal(); return; }
         if (document.getElementById('training-modal').style.display === 'flex') { closeTrainingGuide(); return; }
