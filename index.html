@@ -544,8 +544,8 @@
     .topbar-title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; background: none; border: 0; padding: 0; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .topbar-title.logo { font-size: 23px; letter-spacing: -0.8px; }
     /* 로고: [pb] 아이콘 + pb 글씨 = pbpb */
-    .topbar-logo { display: flex; align-items: baseline; gap: 4px; background: none; border: 0; padding: 0; color: var(--text); flex-shrink: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
-    .logo-mark { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: var(--accent); color: #FFFFFF; font: inherit; letter-spacing: inherit; padding-bottom: 4px; }
+    .topbar-logo { display: flex; align-items: baseline; gap: 4px; background: none; border: 0; padding: 0; color: var(--text); flex-shrink: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+    .logo-mark { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: #FFFFFF; font: inherit; letter-spacing: inherit; padding-bottom: 3px; }
     .logo-word { font: inherit; letter-spacing: inherit; }
     .topbar-label { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; color: var(--sub); padding-left: 12px; margin-left: 2px; border-left: 1.5px solid var(--line-2); line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .topbar-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
@@ -931,6 +931,19 @@
     .btn-danger:disabled { opacity: 0.4; }
     .tile-lock { position: absolute; top: 6px; left: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(23,23,26,0.6); color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
     .lock-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: 11.5px; color: var(--sub); font-weight: 500; vertical-align: 1px; }
+    /* 이름 가리기 */
+    .mask-editor { background: var(--surface); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .mask-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14.5px; }
+    #mask-status { font-size: 12.5px; color: var(--sub); text-align: right; }
+    #mask-status.warn { color: #8A5A00; font-weight: 600; }
+    .mask-stage { position: relative; border-radius: 10px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; background: #FFFFFF; cursor: crosshair; }
+    .mask-stage img { width: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
+    #mask-boxes { position: absolute; inset: 0; }
+    .mask-box { position: absolute; border: 0; padding: 0; background: rgba(43,43,46,0.88); border-radius: 6px; display: flex; align-items: flex-start; justify-content: flex-end; }
+    .mask-box span { width: 22px; height: 22px; margin: -9px -9px 0 0; border-radius: 50%; background: #FFFFFF; color: var(--text); font-size: 15px; line-height: 21px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+    .mask-box.guess { outline: 2.5px dashed #F5B400; outline-offset: 1px; }
+    .mask-box.drawing { background: rgba(201,67,27,0.35); outline: 2px solid var(--accent); pointer-events: none; }
+    .mask-actions { display: flex; gap: 8px; }
     .pd-how { margin: 20px 16px 0; border-radius: 14px; background: var(--surface); }
     .pd-how summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
     .pd-how summary::-webkit-details-marker { display: none; }
@@ -1141,12 +1154,26 @@
             <textarea id="form-notes" rows="3" class="field-input" placeholder="오늘 레이스는 어땠나요?"></textarea>
           </div>
 
-          <label class="goal-switch">
-            <span><b>나만 보기</b><small>켜면 피드·랭킹·내 기록실에서 다른 러너에게 보이지 않아요. 기록증 속 이름과 배번을 공개하고 싶지 않을 때 켜주세요.</small></span>
-            <input type="checkbox" id="form-private">
-            <i aria-hidden="true"></i>
-          </label>
-          <p class="photo-note" style="margin-top:-6px;">공개 기록은 기록증 사진(이름·배번 포함)과 대회 사진이 다른 러너에게 보여요.</p>
+          <div class="fg">
+            <span class="fg-label">공개 범위</span>
+            <div class="seg" id="vis-seg" role="group" aria-label="공개 범위" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0;">
+              <button type="button" class="seg-btn" data-vis="public" onclick="setVisibility('public')">전체 공개</button>
+              <button type="button" class="seg-btn" data-vis="masked" onclick="setVisibility('masked')">이름 가리기</button>
+              <button type="button" class="seg-btn" data-vis="private" onclick="setVisibility('private')">나만 보기</button>
+            </div>
+            <p class="photo-note" id="vis-desc"></p>
+            <input type="checkbox" id="form-private" hidden>
+          </div>
+          <p class="photo-note" id="mask-nocert" hidden>기록증 사진이 없어서 배번 숫자만 숨겨요.</p>
+          <div class="mask-editor" id="mask-editor" hidden>
+            <div class="mask-head"><b>가릴 부분</b><span id="mask-status"></span></div>
+            <div class="mask-stage" id="mask-stage"><img id="mask-img" alt="기록증에서 가릴 부분 고르기" draggable="false"><div id="mask-boxes"></div></div>
+            <div class="mask-actions">
+              <button type="button" class="btn btn-soft btn-sm" onclick="autoDetectMask(true)">자동으로 찾기</button>
+              <button type="button" class="btn btn-line btn-sm" onclick="clearMaskBoxes()">모두 지우기</button>
+            </div>
+            <p class="photo-note">사진 위를 손가락으로 끌어서 가릴 곳에 상자를 그려요. 상자를 누르면 지워져요. 다른 러너에게는 상자 부분을 칠한 기록증이 보여요.</p>
+          </div>
 
           <button type="button" id="delete-record-btn" class="btn-danger-text" style="display:none; align-self:center;" onclick="deleteCurrentRecord()">이 기록 삭제</button>
         </form>
@@ -2099,7 +2126,7 @@
         distanceKm: Number(row.distance_km) || 0, hours: num(row.hours), minutes: num(row.minutes), seconds: num(row.seconds),
         date: row.date || '', bib: row.bib || '', notes: row.notes || '',
         certImageUrl: row.cert_image_url || null, hasCert: Boolean(row.cert_image_url),
-        isPrivate: Boolean(row.is_private)
+        isPrivate: Boolean(row.is_private), maskName: Boolean(row.mask_name)
       };
     }
     function shortTime(r) {
@@ -2576,8 +2603,8 @@
         return `
           <div class="rec-row">
             <div class="row-main" ${action ? `role="button" tabindex="0" onclick="${action}"` : ''}>
-              <div class="row-title"><span class="tag">${CAT_SHORT[bucket] || esc(r.category || '')}</span>${esc(r.name)}${(isSelf && r.isPrivate) ? `<span class="lock-tag">${ICON_LOCK}나만 보기</span>` : ''}</div>
-              <div class="row-sub">${esc(r.date)}${r.bib ? ` · 배번 ${esc(r.bib)}` : ''}</div>
+              <div class="row-title"><span class="tag">${CAT_SHORT[bucket] || esc(r.category || '')}</span>${esc(r.name)}</div>
+              <div class="row-sub">${esc(r.date)}${r.bib ? ` · 배번 ${esc(r.bib)}` : ''}${(isSelf && r.isPrivate) ? `<span class="lock-tag">${ICON_LOCK}나만 보기</span>` : (isSelf && r.maskName) ? `<span class="lock-tag">${ICON_LOCK}이름 가림</span>` : ''}</div>
               ${r.notes ? `<div class="rec-notes">${esc(r.notes)}</div>` : ''}
             </div>
             <div class="row-right">
@@ -3040,6 +3067,8 @@
       loadPhotosFor(records.map(r => r.id)).then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
       loadMyGoals().then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
       loadMyBlocks().then(changed => { if (changed) refreshCurrentView(); });
+      const maskedIds = records.filter(r => r.maskName).map(r => r.id);
+      if (maskedIds.length) loadPrivateInfo(maskedIds).then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
       if (currentMainView === 'profile') renderProfile(false);
       if (otherRunner && currentUser && otherRunner.id === currentUser.id) renderOtherRunner();
     }
@@ -3070,6 +3099,7 @@
         document.getElementById("cert-info-sub").textContent = "사진을 올리면 아래 칸을 자동으로 채워요";
         document.getElementById("modalCertInput").value = "";
       }
+      onMaskCertChanged(dataUrl);
     }
 
     function toggleZoomCertPreview() {
@@ -3116,7 +3146,8 @@
       updateCertPreviewUI(null);
       clearOcrMarks();
       resetFormPhotos([]);
-      document.getElementById('form-private').checked = false;
+      maskBoxes = []; maskSource = null;
+      setVisibility('public');
       document.getElementById("input-modal").style.display = "flex";
       document.querySelector('#input-modal .page-body').scrollTop = 0;
       updateAutoPace();
@@ -3141,12 +3172,15 @@
       document.getElementById('form-private').checked = Boolean(rec.isPrivate);
       await loadPhotosFor([rec.id]);
       resetFormPhotos(recordPhotos.get(rec.id) || []);
+      maskSilent = true;
       if (rec.hasCert) {
         tempCertDataUrl = rec.certImageUrl || (await dbGetCert(rec.id));
         updateCertPreviewUI(tempCertDataUrl);
       } else {
         updateCertPreviewUI(null);
       }
+      maskSilent = false;
+      await prepareVisibilityForEdit(rec);
       document.getElementById("input-modal").style.display = "flex";
       document.querySelector('#input-modal .page-body').scrollTop = 0;
       updateAutoPace();
@@ -3197,7 +3231,16 @@
       let finalCertUrl = null;
       let uploadFailed = false;
       try {
-        if (tempCertDataUrl) {
+        const vis = formVisibility;
+        const prevRec = currentEditingId ? records.find(r => r.id === currentEditingId) : null;
+        const prevPriv = prevRec ? privateInfo.get(prevRec.id) : null;
+        let masked = null;
+        if (vis === 'masked' && tempCertDataUrl) {
+          masked = await saveMaskedCert(recId);
+          if (!masked) return;
+          finalCertUrl = masked.publicUrl;
+          await dbSaveCert(recId, masked.original);
+        } else if (tempCertDataUrl) {
           if (tempCertDataUrl.startsWith("http")) {
             finalCertUrl = tempCertDataUrl;
           } else {
@@ -3221,7 +3264,8 @@
           notes: document.getElementById("form-notes").value.trim(),
           certImageUrl: finalCertUrl,
           hasCert: Boolean(finalCertUrl),
-          isPrivate: document.getElementById('form-private').checked
+          isPrivate: vis === 'private',
+          maskName: vis === 'masked'
         };
 
         let error = null;
@@ -3229,10 +3273,20 @@
           const row = {
             id: recData.id, user_id: currentUser.id, name: recData.name, category: recData.category,
             distance_km: recData.distanceKm, hours: h, minutes: m, seconds: s, pace: recData.pace,
-            date: recData.date, bib: recData.bib, notes: recData.notes, cert_image_url: recData.certImageUrl,
-            is_private: recData.isPrivate
+            date: recData.date, bib: vis === 'masked' ? '' : recData.bib, notes: recData.notes, cert_image_url: recData.certImageUrl,
+            is_private: recData.isPrivate, mask_name: recData.maskName
           };
           ({ error } = await supabaseClient.from('marathon_records').upsert(row, { onConflict: 'id' }));
+          // 이름 가리기 칸이 아직 없을 때 (SQL 실행 전): 원본이 공개되지 않게 저장을 멈춘다
+          if (error && /mask_name/.test(error.message || '')) {
+            if (recData.maskName) {
+              await rollbackMaskedUpload(masked);
+              alert('이름 가리기 기능이 아직 준비되지 않았어요. (Supabase에 mask_setup.sql 실행 필요)');
+              return;
+            }
+            delete row.mask_name;
+            ({ error } = await supabaseClient.from('marathon_records').upsert(row, { onConflict: 'id' }));
+          }
           // 나만 보기 칸이 아직 없을 때 (SQL 실행 전): 공개 기록으로 저장
           if (error && /is_private/.test(error.message || '')) {
             delete row.is_private;
@@ -3240,7 +3294,8 @@
             if (!error && recData.isPrivate) { recData.isPrivate = false; alert('나만 보기 기능이 아직 준비되지 않아서 공개 기록으로 저장했어요. (Supabase에 safety_setup.sql 실행 필요)'); }
           }
         }
-        if (error) { alert("저장하지 못했어요: " + error.message); return; }
+        if (error) { await rollbackMaskedUpload(masked); alert("저장하지 못했어요: " + error.message); return; }
+        if (supabaseClient) await afterRecordSaved(recId, vis, recData.bib, prevRec, prevPriv, masked, finalCertUrl);
 
         let photoResult = { failed: 0 };
         if (photosChanged()) {
@@ -3274,6 +3329,7 @@
       if (!confirm("이 기록을 삭제할까요?\n대회 사진과 기록증도 함께 삭제되고, 되돌릴 수 없어요.")) return false;
       const target = records.find(r => r.id === id);
       await loadPhotosFor([id]);
+      if (target && target.maskName) await loadPrivateInfo([id]);
       if (supabaseClient) {
         const { error } = await supabaseClient.from('marathon_records').delete().eq('id', id).eq('user_id', currentUser.id);
         if (error) { alert("삭제하지 못했어요: " + error.message); return false; }
@@ -3647,6 +3703,8 @@
       if (photos.length) await supabaseClient.storage.from(PHOTO_BUCKET).remove(photos.flatMap(p => [p.path, p.thumb_path])).catch(() => {});
       recordPhotos.delete(recId);
       const m = String(certUrl || '').match(/\/storage\/v1\/object\/public\/certificates\/(.+)$/);
+      const priv = privateInfo.get(recId);
+      if (priv && priv.cert_original_path) { await supabaseClient.storage.from(PRIVATE_BUCKET).remove([priv.cert_original_path]).catch(() => {}); privateInfo.delete(recId); }
       const thumb = certThumbPath(certUrl, currentUser && currentUser.id);
       if (m) await supabaseClient.storage.from('certificates').remove([decodeURIComponent(m[1]), ...(thumb ? [thumb] : [])]).catch(() => {});
     }
@@ -4403,7 +4461,8 @@
         const plan = {
           certificates: [...(await listAllFiles('certificates', uid)), ...legacyCerts],
           avatars: [...(await listAllFiles('avatars', uid)), ...(legacyAvatar && !legacyAvatar.startsWith(uid + '/') ? [legacyAvatar] : [])],
-          'race-photos': await listAllFiles('race-photos', uid)
+          'race-photos': await listAllFiles('race-photos', uid),
+          [PRIVATE_BUCKET]: await listAllFiles(PRIVATE_BUCKET, uid)
         };
         for (const [bucket, paths] of Object.entries(plan)) {
           for (let i = 0; i < paths.length; i += 100) await supabaseClient.storage.from(bucket).remove(paths.slice(i, i + 100)).catch(() => {});
@@ -4502,6 +4561,410 @@
       document.querySelectorAll('.overlay, .page-modal, .pviewer').forEach(el => mo.observe(el, { attributes: true, attributeFilter: ['style'] }));
     }
 
+    // ---------- 기록증 속 이름 · 배번 위치 찾기 (가림 상자 자동 제안) ----------
+    const MASK_NAME_LABEL = /^(성\s*명|성명|이\s*름|이름|name|성명name|이름name|참가자|주자)$/i;
+    const MASK_BIB_LABEL = /^(배\s*번|배번|번\s*호|참가번호|bib|no\.?|number|배번호)$/i;
+    const MASK_STOP = /마라톤|대회|기록|완주|축하|증명|인증|확인|종목|부문|코스|하프|풀코스|남자|여자|^남$|^여$|모바일|참가|번호|배번|성별|구간|순위|시간|특별시|광역시|시장|회장|구청장|군수|도지사|위원장|대표|이사|협회|연맹|록증|체육|일보|신문|방송|full|half|record|course|certificate|finisher|marathon|division|gender|time|runner|korea|seoul/i;
+
+    function maskWordsFrom(data, scale) {
+      const out = [];
+      (data.words || []).forEach(w => {
+        const t = String(w.text || '').replace(/[|:：;,."'`·()[\]{}<>]/g, '').trim();
+        if (!t) return;
+        const b = w.bbox;
+        out.push({ t, x0: b.x0 / scale, y0: b.y0 / scale, x1: b.x1 / scale, y1: b.y1 / scale, conf: w.confidence });
+      });
+      return out;
+    }
+    const isHangulName = (t) => /^[가-힣]{1,5}$/.test(t) && !MASK_STOP.test(t);
+    const isLatinName = (t) => /^[A-Z][A-Za-z\-]{1,15}$/.test(t) && !MASK_STOP.test(t) && !MASK_NAME_LABEL.test(t);
+    function boxUnion(ws) {
+      return { x0: Math.min(...ws.map(w => w.x0)), y0: Math.min(...ws.map(w => w.y0)), x1: Math.max(...ws.map(w => w.x1)), y1: Math.max(...ws.map(w => w.y1)) };
+    }
+    function padBox(b, W, H, k) {
+      const p = Math.max(4, (b.y1 - b.y0) * (k || 0.25));
+      const px = p * 2;   // 글자 상자는 좌우가 빠듯하게 잡혀서 옆으로 더 넉넉히
+      return { x0: Math.max(0, b.x0 - px), y0: Math.max(0, b.y0 - p), x1: Math.min(W, b.x1 + px), y1: Math.min(H, b.y1 + p) };
+    }
+    // 라벨 오른쪽(같은 줄) → 없으면 아래쪽에서 값 찾기
+    function valueNearLabel(words, label, accept) {
+      const h = label.y1 - label.y0, cy = (label.y0 + label.y1) / 2;
+      const right = words.filter(w => w !== label && w.x0 > label.x1 - h * 0.2 && Math.abs((w.y0 + w.y1) / 2 - cy) < Math.max(h, w.y1 - w.y0) * 0.7)
+        .sort((a, b) => a.x0 - b.x0);
+      const pick = [];
+      for (const w of right) {
+        if (MASK_NAME_LABEL.test(w.t) || MASK_BIB_LABEL.test(w.t)) { if (pick.length) break; else continue; }
+        if (accept(w.t)) {
+          if (pick.length && w.x0 - pick[pick.length - 1].x1 > (w.y1 - w.y0) * 2.5) break;
+          pick.push(w);
+          if (pick.length >= 4) break;
+        } else if (pick.length) break;
+      }
+      if (pick.length) return boxUnion(pick);
+      const lw = label.x1 - label.x0;
+      const below = words.filter(w => w !== label && w.y0 > label.y1 - h * 0.2 && w.y0 < label.y1 + Math.max(h * 6, 40)
+        && (w.x0 + w.x1) / 2 > label.x0 - Math.max(h * 6, lw * 2) && (w.x0 + w.x1) / 2 < label.x1 + Math.max(h * 6, lw * 2) && accept(w.t))
+        .sort((a, b) => a.y0 - b.y0);
+      if (below.length) {
+        const first = below[0];
+        const row = below.filter(w => Math.abs(w.y0 - first.y0) < (first.y1 - first.y0) * 0.6);
+        return boxUnion(row);
+      }
+      return null;
+    }
+
+    // "성 명", "김 진 섭"처럼 한 글자씩 떨어져 읽힌 한글을 한 단어로 합친 후보를 더한다
+    function mergeSpacedHangul(allWords) {
+      // 판독 패스마다 따로 합친다 (여러 패스가 같은 글자를 겹쳐 읽은 것을 한 단어로 붙이지 않게)
+      const passes = [...new Set(allWords.map(w => w.p))];
+      return passes.flatMap(p => mergeSpacedHangulOne(allWords.filter(w => w.p === p)));
+    }
+    function mergeSpacedHangulOne(words) {
+      const out = [];
+      const single = words.filter(w => /^[가-힣]{1,2}$/.test(w.t)).sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0);
+      const used = new Set();
+      for (const w of single) {
+        if (used.has(w)) continue;
+        const h = w.y1 - w.y0;
+        // 한 글자씩 떨어진 큰 이름은 글자마다 상자 높이가 다르게 잡히기도 해서(받침 유무) 높이는 2.2배까지 허용
+        const row = single.filter(o => {
+          if (used.has(o)) return false;
+          const oh = o.y1 - o.y0, mh = Math.max(h, oh);
+          return Math.abs((o.y0 + o.y1) / 2 - (w.y0 + w.y1) / 2) < mh * 0.4 && Math.max(h, oh) / Math.min(h, oh) < 2.2;
+        }).sort((a, b) => a.x0 - b.x0);
+        let run = [];
+        const flush = () => { if (run.length >= 2) out.push({ t: run.map(r => r.t).join(''), ...boxUnion(run), merged: true }); run = []; };
+        for (const o of row) {
+          const lastH = run.length ? Math.min(run[run.length - 1].y1 - run[run.length - 1].y0, o.y1 - o.y0) : 0;
+          if (run.length && o.x0 - run[run.length - 1].x1 > Math.max(lastH, h) * 1.6) flush();
+          run.push(o); used.add(o);
+        }
+        flush();
+      }
+      return out;
+    }
+
+    // 결과: [{ kind: 'name'|'bib', x0..y1 (원본 픽셀), guess: 라벨 없이 추정했는지 }]
+    async function detectSensitiveBoxes(dataUrl, bib, raceName) {
+      const job = OCR.queue.then(async () => {
+        await ensureOcrWorkers();
+        const tw = OCR.textWorker;
+        const img = await loadImageEl(dataUrl);
+        const W = img.naturalWidth, H = img.naturalHeight;
+        const scale = Math.min(2, 2000 / W) || 1;
+        const big = imageToCanvas(img, W * scale);
+        let words = [];
+        let pass = 0;
+        for (const [psm, canvas] of [['11', big], ['11', canvasBinarize(big, 'light')], ['3', big]]) {
+          await tw.setParameters({ tessedit_pageseg_mode: psm });
+          const { data } = await tw.recognize(canvas);
+          const p = pass++;
+          words = words.concat(maskWordsFrom(data, scale).map(w => ({ ...w, p })));
+        }
+        await tw.setParameters({ tessedit_pageseg_mode: '3' });
+        words = words.concat(mergeSpacedHangul(words));
+        const boxes = [];
+        const add = (kind, b, guess) => {
+          if (!b) return;
+          const p = padBox(b, W, H, 0.3);
+          if (boxes.some(o => o.kind === kind && !(p.x1 < o.x0 || p.x0 > o.x1 || p.y1 < o.y0 || p.y0 > o.y1))) return;
+          boxes.push({ kind, ...p, guess: Boolean(guess) });
+        };
+        const raceWords = new Set(String(raceName || '').split(/\s+/).map(s => s.replace(/[^가-힣A-Za-z0-9]/g, '')).filter(Boolean));
+        const nameOk = (t) => (isHangulName(t) || isLatinName(t)) && !raceWords.has(t);
+
+        // 이름: 라벨 기준
+        const nameLabels = words.filter(w => MASK_NAME_LABEL.test(w.t) || /^(성명|이름)/.test(w.t));
+        nameLabels.forEach(l => {
+          const inline = l.t.match(/^(?:성명|이름)([가-힣]{2,4})$/);   // "성명홍길동"처럼 붙어 읽힌 경우
+          if (inline) add('name', { x0: l.x0 + (l.x1 - l.x0) * 0.4, y0: l.y0, x1: l.x1, y1: l.y1 });
+          else add('name', valueNearLabel(words, l, nameOk));
+        });
+        // 배번 먼저 (이름을 추정할 때 기준으로 쓴다)
+        const bibDigits = String(bib || '').replace(/\D/g, '');
+        if (bibDigits.length >= 2) {
+          words.filter(w => w.t.replace(/\D/g, '') === bibDigits || (w.t.replace(/\D/g, '').includes(bibDigits) && w.t.replace(/\D/g, '').length <= bibDigits.length + 2))
+            .forEach(w => add('bib', w));
+        }
+        words.filter(w => MASK_BIB_LABEL.test(w.t)).forEach(l => add('bib', valueNearLabel(words, l, (t) => /^[A-Z]?\d{2,6}[A-Z]?$/.test(t))));
+        // 이름: 라벨이 없으면 ① 배번 가까이 있는 한글 2~4자 ② 가장 크게 쓰인 한글 2~4자
+        if (!boxes.some(b => b.kind === 'name')) {
+          const hs = words.map(w => w.y1 - w.y0).sort((a, b) => a - b);
+          const med = hs[Math.floor(hs.length / 2)] || 1;
+          const cand = words.filter(w => /^[가-힣]{2,4}$/.test(w.t) && nameOk(w.t));
+          const bibBox = boxes.find(b => b.kind === 'bib');
+          let pick = null;
+          if (bibBox) {
+            const bh = bibBox.y1 - bibBox.y0, bx = (bibBox.x0 + bibBox.x1) / 2, by = (bibBox.y0 + bibBox.y1) / 2;
+            const near = cand.map(w => ({ w, d: Math.hypot(((w.x0 + w.x1) / 2 - bx) / 2, (w.y0 + w.y1) / 2 - by) }))
+              .filter(o => o.d < bh * 8 && (o.w.y1 - o.w.y0) > med * 0.9).sort((a, b) => a.d - b.d);
+            if (near[0]) pick = near[0].w;
+          }
+          if (!pick) pick = cand.filter(w => (w.y1 - w.y0) > med * 1.6).sort((a, b) => (b.y1 - b.y0) - (a.y1 - a.y0))[0];
+          if (pick) add('name', pick, true);
+        }
+        return { boxes, width: W, height: H };
+      });
+      OCR.queue = job.catch(() => {});
+      return job;
+    }
+
+    // ========================================================
+    // 공개 범위 (전체 공개 / 이름 가리기 / 나만 보기) + 기록증 가림 편집
+    // - 이름 가리기: 다른 러너에게는 이름·배번을 칠한 기록증만 공개, 배번 숫자도 숨김
+    //   원본 기록증과 배번은 본인만 볼 수 있는 곳(certificates-private 버킷, record_private 테이블)에 보관
+    // ========================================================
+    const PRIVATE_BUCKET = 'certificates-private';
+    let formVisibility = 'public';
+    let maskBoxes = [];                 // [{ x, y, w, h (0~1 비율), kind: 'name'|'bib'|'manual', guess }]
+    let maskSource = null;              // 상자를 그린 기록증 (dataURL)
+    let maskDetecting = false;
+    let maskSilent = false;             // 수정 화면에서 저장된 상자를 불러오는 중
+    let privateInfo = new Map();        // record_id → { bib, cert_original_path, mask_boxes }
+
+    const VIS_DESC = {
+      public: '기록증 사진(이름·배번 포함)과 대회 사진이 다른 러너에게 보여요.',
+      masked: '다른 러너에게는 이름·배번을 칠한 기록증만 보이고, 배번 숫자도 숨겨요. 원본은 나만 볼 수 있게 따로 보관해요.',
+      private: '피드·랭킹·러너 기록실 어디에서도 다른 러너에게 보이지 않아요.'
+    };
+
+    function setVisibility(v) {
+      formVisibility = v;
+      document.querySelectorAll('#vis-seg .seg-btn').forEach(b => {
+        const on = b.dataset.vis === v;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on);
+      });
+      document.getElementById('form-private').checked = v === 'private';
+      document.getElementById('vis-desc').textContent = VIS_DESC[v];
+      refreshMaskEditor();
+      if (v === 'masked' && tempCertDataUrl && !maskBoxes.length && maskSource !== tempCertDataUrl) autoDetectMask();
+    }
+
+    function refreshMaskEditor() {
+      const box = document.getElementById('mask-editor');
+      const noCert = document.getElementById('mask-nocert');
+      const show = formVisibility === 'masked';
+      box.hidden = !(show && tempCertDataUrl);
+      noCert.hidden = !(show && !tempCertDataUrl);
+      if (box.hidden) return;
+      const img = document.getElementById('mask-img');
+      if (img.getAttribute('src') !== tempCertDataUrl) img.src = tempCertDataUrl;
+      renderMaskBoxes();
+    }
+
+    function renderMaskBoxes() {
+      const layer = document.getElementById('mask-boxes');
+      layer.innerHTML = maskBoxes.map((b, i) => `
+        <button type="button" class="mask-box ${b.guess ? 'guess' : ''}" style="left:${b.x * 100}%; top:${b.y * 100}%; width:${b.w * 100}%; height:${b.h * 100}%;"
+          onclick="removeMaskBox(${i})" aria-label="${b.kind === 'bib' ? '배번' : b.kind === 'name' ? '이름' : '가림'} 상자 지우기"><span>×</span></button>`).join('');
+      const st = document.getElementById('mask-status');
+      if (maskDetecting) return;
+      const hasName = maskBoxes.some(b => b.kind === 'name' || b.kind === 'manual');
+      st.textContent = !maskBoxes.length ? '가릴 곳에 상자를 그려주세요'
+        : maskBoxes.some(b => b.guess) ? '자동으로 찾은 위치가 맞는지 확인해주세요'
+        : hasName ? `${maskBoxes.length}곳을 가려요` : '이름 위치를 못 찾았어요. 직접 그려주세요';
+      st.classList.toggle('warn', !maskBoxes.length || maskBoxes.some(b => b.guess) || !hasName);
+    }
+    function removeMaskBox(i) { maskBoxes.splice(i, 1); renderMaskBoxes(); }
+    function clearMaskBoxes() { maskBoxes = []; renderMaskBoxes(); }
+
+    // 새 기록증을 고르면 상자를 지우고, 기록증 판독이 끝난 뒤(배번을 알고 나서) 자동으로 찾는다
+    function onMaskCertChanged(dataUrl) {
+      if (maskSilent) return;
+      maskBoxes = [];
+      maskSource = null;
+      refreshMaskEditor();
+      if (dataUrl && formVisibility === 'masked') setTimeout(() => OCR.queue.then(() => autoDetectMask()), 0);
+    }
+
+    async function ensureDataUrl(src) {
+      if (!src || src.startsWith('data:')) return src;
+      const res = await fetch(src, { cache: 'no-store' });
+      if (!res.ok) throw new Error('image ' + res.status);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(blob); });
+    }
+
+    async function autoDetectMask(force) {
+      if (!tempCertDataUrl || maskDetecting) return;
+      const st = document.getElementById('mask-status');
+      maskDetecting = true;
+      st.textContent = '이름·배번 위치를 찾는 중…';
+      st.classList.remove('warn');
+      try {
+        const src = await ensureDataUrl(tempCertDataUrl);
+        if (src !== tempCertDataUrl && !tempCertDataUrl.startsWith('data:')) tempCertDataUrl = src;
+        const r = await detectSensitiveBoxes(src, document.getElementById('form-bib').value, document.getElementById('form-name').value);
+        const found = r.boxes.map(b => ({ x: b.x0 / r.width, y: b.y0 / r.height, w: (b.x1 - b.x0) / r.width, h: (b.y1 - b.y0) / r.height, kind: b.kind, guess: b.guess }));
+        maskBoxes = force ? found.concat(maskBoxes.filter(b => b.kind === 'manual')) : found;
+        maskSource = tempCertDataUrl;
+      } catch (e) {
+        console.warn('mask detect:', e);
+      } finally {
+        maskDetecting = false;
+        refreshMaskEditor();
+      }
+    }
+
+    // 손가락으로 끌어서 상자 그리기
+    function initMaskDrawing() {
+      const stage = document.getElementById('mask-stage');
+      let start = null, ghost = null;
+      const pt = (e) => { const r = stage.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; };
+      stage.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.mask-box')) return;
+        start = pt(e);
+        ghost = document.createElement('div');
+        ghost.className = 'mask-box drawing';
+        document.getElementById('mask-boxes').appendChild(ghost);
+        stage.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      stage.addEventListener('pointermove', (e) => {
+        if (!start || !ghost) return;
+        const p = pt(e);
+        Object.assign(ghost.style, { left: Math.min(start.x, p.x) * 100 + '%', top: Math.min(start.y, p.y) * 100 + '%', width: Math.abs(p.x - start.x) * 100 + '%', height: Math.abs(p.y - start.y) * 100 + '%' });
+      });
+      const end = (e) => {
+        if (!start) return;
+        const p = pt(e);
+        const b = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y), kind: 'manual', guess: false };
+        start = null;
+        if (ghost) { ghost.remove(); ghost = null; }
+        if (b.w > 0.03 && b.h > 0.012) { maskBoxes.push(b); maskBoxes.forEach(o => { o.guess = false; }); }
+        renderMaskBoxes();
+      };
+      stage.addEventListener('pointerup', end);
+      stage.addEventListener('pointercancel', () => { start = null; if (ghost) { ghost.remove(); ghost = null; } });
+    }
+
+    async function renderMaskedDataUrl(src, boxes) {
+      const img = await loadImageEl(src);
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, W, H);
+      ctx.fillStyle = '#2B2B2E';
+      boxes.forEach(b => {
+        const x = b.x * W, y = b.y * H, w = b.w * W, h = b.h * H, r = Math.min(10, w / 4, h / 4);
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+        ctx.fill();
+      });
+      return c.toDataURL('image/jpeg', 0.9);
+    }
+
+    // ---------- 저장소 (본인만 보는 원본) ----------
+    async function uploadPrivateOriginal(recId, dataUrl) {
+      const blob = dataURLtoBlob(dataUrl);
+      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+      const path = `${currentUser.id}/${recId}_${Date.now()}.${ext}`;
+      const { error } = await supabaseClient.storage.from(PRIVATE_BUCKET).upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
+      if (error) throw error;
+      return path;
+    }
+    async function privateOriginalUrl(path) {
+      const { data, error } = await supabaseClient.storage.from(PRIVATE_BUCKET).createSignedUrl(path, 600);
+      if (error) throw error;
+      return data.signedUrl;
+    }
+    async function loadPrivateInfo(ids) {
+      if (!currentUser || !supabaseClient || !ids.length) return false;
+      try {
+        const { data, error } = await supabaseClient.from('record_private').select('record_id, bib, cert_original_path, mask_boxes').in('record_id', ids);
+        if (error) return false;
+        (data || []).forEach(p => privateInfo.set(p.record_id, p));
+        let changed = false;
+        records.forEach(r => { const p = privateInfo.get(r.id); if (p && r.maskName && p.bib && r.bib !== p.bib) { r.bib = p.bib; changed = true; } });
+        return changed;
+      } catch (e) { return false; }
+    }
+
+    // 저장 버튼: 원본(비공개) → 가린 기록증(공개) 순서로 올린다. 실패하면 아무것도 공개하지 않는다
+    async function saveMaskedCert(recId) {
+      if (!maskBoxes.length && !confirm('가릴 부분이 없어요. 기록증을 그대로 공개할까요?\n\n[취소]를 누르면 돌아가서 가릴 곳을 그릴 수 있어요.')) return null;
+      const original = await ensureDataUrl(tempCertDataUrl);
+      let origPath = null;
+      try {
+        origPath = await uploadPrivateOriginal(recId, original);
+      } catch (e) {
+        console.warn('private upload:', e);
+        alert(/bucket|not found|policy|row-level/i.test(String(e.message || e))
+          ? '이름 가리기 기능이 아직 준비되지 않았어요. (Supabase에 mask_setup.sql 실행 필요)'
+          : '원본 기록증을 보관하지 못했어요. 잠시 후 다시 시도해주세요.');
+        return null;
+      }
+      const masked = await renderMaskedDataUrl(original, maskBoxes);
+      const publicUrl = await uploadCertToSupabase(recId, masked);
+      if (!publicUrl) {
+        await supabaseClient.storage.from(PRIVATE_BUCKET).remove([origPath]).catch(() => {});
+        alert('기록증 사진을 올리지 못했어요. 잠시 후 다시 시도해주세요.');
+        return null;
+      }
+      return { publicUrl, origPath, original };
+    }
+    async function rollbackMaskedUpload(res) {
+      if (!res) return;
+      await supabaseClient.storage.from(PRIVATE_BUCKET).remove([res.origPath]).catch(() => {});
+      const p = storagePathOf(res.publicUrl, 'certificates');
+      const t = certThumbPath(res.publicUrl, currentUser.id);
+      if (p) await supabaseClient.storage.from('certificates').remove([p, ...(t ? [t] : [])]).catch(() => {});
+    }
+
+    // 기록 저장이 끝난 뒤: 비공개 정보 저장 + 바뀐 예전 파일 정리
+    async function afterRecordSaved(recId, vis, realBib, prevRec, prevPriv, masked, finalCertUrl) {
+      if (vis === 'masked') {
+        const row = {
+          record_id: recId, user_id: currentUser.id, bib: realBib || null,
+          cert_original_path: masked ? masked.origPath : (prevPriv && prevPriv.cert_original_path) || null,
+          mask_boxes: maskBoxes.map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, kind: b.kind })), updated_at: new Date().toISOString()
+        };
+        const { error } = await supabaseClient.from('record_private').upsert(row, { onConflict: 'record_id' });
+        if (error) console.warn('record_private:', error.message);
+        else privateInfo.set(recId, row);
+        if (masked && prevPriv && prevPriv.cert_original_path && prevPriv.cert_original_path !== masked.origPath) {
+          await supabaseClient.storage.from(PRIVATE_BUCKET).remove([prevPriv.cert_original_path]).catch(() => {});
+        }
+      } else if (prevPriv) {
+        await supabaseClient.from('record_private').delete().eq('record_id', recId);
+        if (prevPriv.cert_original_path) await supabaseClient.storage.from(PRIVATE_BUCKET).remove([prevPriv.cert_original_path]).catch(() => {});
+        privateInfo.delete(recId);
+      }
+      // 기록증을 바꿨으면 예전 공개 파일(원본일 수 있음)과 미리보기를 지운다
+      if (prevRec && prevRec.certImageUrl && prevRec.certImageUrl !== finalCertUrl) {
+        const p = storagePathOf(prevRec.certImageUrl, 'certificates');
+        const t = certThumbPath(prevRec.certImageUrl, currentUser.id);
+        if (p) await supabaseClient.storage.from('certificates').remove([p, ...(t ? [t] : [])]).catch(() => {});
+      }
+    }
+
+    // 수정 화면 열 때: 이름 가린 기록이면 원본·배번·상자를 불러온다
+    async function prepareVisibilityForEdit(rec) {
+      maskBoxes = []; maskSource = null;
+      const vis = rec.maskName ? 'masked' : rec.isPrivate ? 'private' : 'public';
+      if (rec.maskName) {
+        await loadPrivateInfo([rec.id]);
+        const p = privateInfo.get(rec.id);
+        if (p) {
+          if (p.bib) document.getElementById('form-bib').value = p.bib;
+          if (p.cert_original_path) {
+            try {
+              const original = await ensureDataUrl(await privateOriginalUrl(p.cert_original_path));
+              maskSilent = true;
+              tempCertDataUrl = original;
+              updateCertPreviewUI(original);
+            } catch (e) { console.warn('original load:', e); }
+            finally { maskSilent = false; }
+          }
+          maskBoxes = (p.mask_boxes || []).map(b => ({ ...b, guess: false }));
+          maskSource = tempCertDataUrl;
+        }
+      }
+      setVisibility(vis);
+    }
+
     // ========================================================
     // 시작
     // ========================================================
@@ -4528,6 +4991,7 @@
       await initIndexedDB();
       await initAuthListener();
       watchLayersForBack();
+      initMaskDrawing();
       await syncFromCloud();
       switchMainView('feed');
     });
@@ -4578,7 +5042,8 @@
               notes: row.notes || "",
               certImageUrl: row.cert_image_url || null,
               hasCert: Boolean(row.cert_image_url),
-              isPrivate: Boolean(row.is_private)
+              isPrivate: Boolean(row.is_private),
+              maskName: Boolean(row.mask_name)
             }));
             if (statusBadge) statusBadge.innerHTML = "☁️ 클라우드 동기화 완료";
             sortAndRenderApp();
