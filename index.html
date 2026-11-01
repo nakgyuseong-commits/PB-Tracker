@@ -543,6 +543,11 @@
     }
     .topbar-title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; background: none; border: 0; padding: 0; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .topbar-title.logo { font-size: 23px; letter-spacing: -0.8px; }
+    /* 로고: [pb] 아이콘 + pb 글씨 = pbpb */
+    .topbar-logo { display: flex; align-items: baseline; gap: 4px; background: none; border: 0; padding: 0; color: var(--text); flex-shrink: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+    .logo-mark { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: var(--accent); color: #FFFFFF; font: inherit; letter-spacing: inherit; padding-bottom: 4px; }
+    .logo-word { font: inherit; letter-spacing: inherit; }
+    .topbar-label { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; color: var(--sub); padding-left: 12px; margin-left: 2px; border-left: 1.5px solid var(--line-2); line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .topbar-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
     .icon-btn { width: 44px; height: 44px; border: 0; background: transparent; color: var(--text); display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
     .icon-btn:active { background: var(--surface); }
@@ -943,7 +948,8 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <button id="topbar-title" class="topbar-title logo" onclick="switchMainView('feed')">pbpb</button>
+      <button id="topbar-title" class="topbar-logo" onclick="switchMainView('feed')" aria-label="pbpb 홈으로"><span class="logo-mark" aria-hidden="true">pb</span><span class="logo-word" aria-hidden="true">pb</span></button>
+      <span id="topbar-label" class="topbar-label" hidden></span>
       <div class="topbar-actions">
         <button id="topbar-search" class="icon-btn" aria-label="러너 찾기" onclick="switchMainView('runners')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -2135,13 +2141,11 @@
     // 상단바 / 하단 탭 이동
     // ========================================================
     function updateTopbar() {
-      const title = document.getElementById('topbar-title');
-      const isFeed = currentMainView === 'feed';
-      title.classList.toggle('logo', isFeed);
-      if (isFeed) title.textContent = 'pbpb';
-      else if (currentMainView === 'ranking') title.textContent = '랭킹';
-      else if (currentMainView === 'runners') title.textContent = '러너 찾기';
-      else title.textContent = (currentUser && currentProfile && currentProfile.nickname) || '내 기록실';
+      // 왼쪽 위는 모든 탭에서 로고 고정, 그 옆에 지금 탭 이름
+      const label = { feed: '', ranking: '랭킹', runners: '러너 찾기', profile: '내 기록실' }[currentMainView] || '';
+      const lab = document.getElementById('topbar-label');
+      lab.textContent = label;
+      lab.hidden = !label;
       // 세 줄 메뉴는 모든 탭에 (돋보기는 하단 '러너 찾기' 탭과 같아서 뺀다)
       document.getElementById('topbar-search').hidden = true;
       document.getElementById('topbar-menu').hidden = false;
@@ -2161,6 +2165,7 @@
       else if (view === 'ranking') loadRankingLeaderboard();
       else if (view === 'runners') loadRunnersDirectory();
       else renderProfile(true);
+      if (typeof ensureBackGuard === 'function') ensureBackGuard();
     }
 
     function updateAuthUI() {
@@ -2645,7 +2650,7 @@
       }
       root.innerHTML = profileBodyHtml({
         uid: currentUser.id, profile: currentProfile, recs: records, counts: myFollowCounts,
-        tab: profileTab, isSelf: true, showName: false, goals: myGoals
+        tab: profileTab, isSelf: true, showName: true, goals: myGoals
       });
       if (refreshCounts) {
         loadFollowCounts(currentUser.id).then(c => {
@@ -4450,7 +4455,52 @@
       alert('비밀번호를 바꿨어요.');
     }
 
-    function openPolicyPage(name) { window.open(`${name}.html`, '_blank', 'noopener'); }
+    function openPolicyPage(name) { location.href = `${name}.html`; }
+
+    // ========================================================
+    // 폰의 뒤로 가기 = 화면 안의 뒤로 가기
+    // 열린 창(시트·전체 화면)이 있으면 맨 위 창을 닫고, 하단 탭이 피드가 아니면 피드로 간다.
+    // 브라우저 기록에 "보호용 칸" 하나만 두고, 뒤로 가기가 그 칸을 쓰면 다시 채운다.
+    // ========================================================
+    const BACK_SKIP = new Set(['batch-progress-modal']);   // 진행 중 화면은 뒤로 가기로 닫지 않는다
+    function openLayers() {
+      return [...document.querySelectorAll('.overlay, .page-modal, .pviewer')]
+        .filter(el => el.style.display === 'flex');
+    }
+    function topLayer() {
+      const list = openLayers();
+      if (!list.length) return null;
+      const all = [...document.querySelectorAll('.overlay, .page-modal, .pviewer')];
+      return list.sort((a, b) => ((parseInt(getComputedStyle(a).zIndex) || 0) - (parseInt(getComputedStyle(b).zIndex) || 0)) || (all.indexOf(a) - all.indexOf(b))).pop();
+    }
+    function needsBackGuard() { return openLayers().length > 0 || currentMainView !== 'feed'; }
+    function ensureBackGuard() {
+      if (!needsBackGuard()) return;
+      if (history.state && history.state.pbpbGuard) return;
+      try { history.pushState({ pbpbGuard: true }, ''); } catch (e) {}
+    }
+    function closeLayer(el) {
+      if (BACK_SKIP.has(el.id)) return false;
+      const handler = el.getAttribute('onclick');
+      if (handler && /event\.target===this/.test(handler)) { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; }
+      const btn = el.querySelector('.page-head button[aria-label="뒤로"], .page-head button[aria-label="닫기"], .dialog-head button[aria-label="닫기"], .pv-top button[aria-label="닫기"], .sheet-cancel');
+      if (btn) { btn.click(); return true; }
+      el.style.display = 'none';
+      return true;
+    }
+    window.addEventListener('popstate', () => {
+      const top = topLayer();
+      if (top) closeLayer(top);
+      else if (currentMainView !== 'feed') switchMainView('feed');
+      else { history.back(); return; }   // 남아 있던 보호용 칸이었으면 한 번 더: 원래 뒤로 가기 (앱 나가기)
+      setTimeout(ensureBackGuard, 0);
+    });
+    // 창이 열릴 때마다 보호용 칸을 준비
+    function watchLayersForBack() {
+      try { if (history.state && history.state.pbpbGuard) history.replaceState(null, ''); } catch (e) {}
+      const mo = new MutationObserver(() => ensureBackGuard());
+      document.querySelectorAll('.overlay, .page-modal, .pviewer').forEach(el => mo.observe(el, { attributes: true, attributeFilter: ['style'] }));
+    }
 
     // ========================================================
     // 시작
@@ -4477,6 +4527,7 @@
       updateTopbar();
       await initIndexedDB();
       await initAuthListener();
+      watchLayersForBack();
       await syncFromCloud();
       switchMainView('feed');
     });

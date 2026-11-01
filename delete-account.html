@@ -9,10 +9,11 @@
   :root { --text:#17171A; --sub:#6B6B70; --line:#ECEAE5; --surface:#F6F5F2; --accent:#C9431B; }
   * { box-sizing: border-box; }
   body { margin:0; background:#FFFFFF; color:var(--text); font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif; line-height:1.7; word-break:keep-all; }
-  main { max-width:720px; margin:0 auto; padding:24px 20px 64px; }
-  header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-  header img { width:36px; height:36px; border-radius:9px; }
-  header a { color:var(--text); font-weight:800; text-decoration:none; font-size:20px; letter-spacing:-0.3px; }
+  main { max-width:720px; margin:0 auto; padding:8px 20px 64px; }
+  .bar { position:sticky; top:0; z-index:5; background:rgba(255,255,255,0.96); backdrop-filter:saturate(180%) blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; padding:8px; min-height:60px; }
+  .back { width:44px; height:44px; border:0; background:none; color:var(--text); display:inline-flex; align-items:center; justify-content:center; border-radius:12px; cursor:pointer; }
+  .back:active { background:var(--surface); }
+  .bar-title { font-size:16px; font-weight:700; }
   h1 { font-size:24px; margin:20px 0 4px; letter-spacing:-0.4px; }
   .meta { color:var(--sub); font-size:14px; margin:0 0 24px; }
   h2 { font-size:17px; margin:28px 0 8px; }
@@ -28,8 +29,12 @@
 </style>
 </head>
 <body>
+<header class="bar">
+  <button type="button" class="back" aria-label="뒤로" onclick="goBack()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <div class="bar-title">계정 삭제 안내</div>
+  <span style="width:44px;"></span>
+</header>
 <main>
-<header><img src="icon-192.png" alt=""><a href="./">pbpb</a></header>
 
 <h1>계정 삭제 안내</h1>
 <p class="meta">PBPB(Personal Best Pace Book)</p>
@@ -63,5 +68,12 @@
 
 <nav><a href="./">PBPB로 돌아가기</a><a href="terms.html">이용약관</a><a href="privacy.html">개인정보처리방침</a><a href="delete-account.html">계정 삭제 안내</a></nav>
 </main>
+<script>
+  // 앱에서 들어왔으면 이전 화면으로, 링크로 바로 열었으면 PBPB 첫 화면으로
+  function goBack() {
+    try { if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) { history.back(); return; } } catch (e) {}
+    location.href = './';
+  }
+</script>
 </body>
 </html>
