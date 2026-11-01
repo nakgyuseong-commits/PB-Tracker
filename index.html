@@ -909,6 +909,23 @@
     .ig-note, #install-guide-body > p { font-size: 13px; color: var(--sub); line-height: 1.6; padding: 10px 6px 0; }
     .pb-share-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .pb-share-btns .btn { display: flex; align-items: center; justify-content: center; gap: 6px; }
+    /* 안전 기능 */
+    .more-btn { color: var(--muted); margin-left: -6px; flex-shrink: 0; }
+    .pf-buttons .more-wide { flex: 0 0 52px; display: flex; align-items: center; justify-content: center; padding: 0; }
+    .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.55; color: var(--sub); }
+    .consent input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--accent); flex-shrink: 0; }
+    .consent a { color: var(--text); text-decoration: underline; }
+    .link-btn.muted { color: var(--sub); font-weight: 500; font-size: 13.5px; padding: 6px; }
+    .rp-reasons { display: flex; flex-direction: column; gap: 6px; }
+    .rp-reason { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--surface); font-size: 14.5px; }
+    .rp-reason input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .da-box { background: var(--surface); border-radius: 14px; padding: 14px 16px; font-size: 14px; line-height: 1.6; }
+    .da-box ul { margin: 6px 0 8px; padding-left: 20px; }
+    .da-box .sub { font-size: 12.5px; color: var(--sub); }
+    .btn-danger { background: var(--danger); color: #FFFFFF; }
+    .btn-danger:disabled { opacity: 0.4; }
+    .tile-lock { position: absolute; top: 6px; left: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(23,23,26,0.6); color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+    .lock-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: 11.5px; color: var(--sub); font-weight: 500; vertical-align: 1px; }
     .pd-how { margin: 20px 16px 0; border-radius: 14px; background: var(--surface); }
     .pd-how summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
     .pd-how summary::-webkit-details-marker { display: none; }
@@ -1118,6 +1135,13 @@
             <textarea id="form-notes" rows="3" class="field-input" placeholder="오늘 레이스는 어땠나요?"></textarea>
           </div>
 
+          <label class="goal-switch">
+            <span><b>나만 보기</b><small>켜면 피드·랭킹·내 기록실에서 다른 러너에게 보이지 않아요. 기록증 속 이름과 배번을 공개하고 싶지 않을 때 켜주세요.</small></span>
+            <input type="checkbox" id="form-private">
+            <i aria-hidden="true"></i>
+          </label>
+          <p class="photo-note" style="margin-top:-6px;">공개 기록은 기록증 사진(이름·배번 포함)과 대회 사진이 다른 러너에게 보여요.</p>
+
           <button type="button" id="delete-record-btn" class="btn-danger-text" style="display:none; align-self:center;" onclick="deleteCurrentRecord()">이 기록 삭제</button>
         </form>
       </div>
@@ -1158,7 +1182,12 @@
         <div class="fg"><label for="auth-email">이메일</label><input type="email" id="auth-email" required placeholder="runner@example.com" class="field-input" autocomplete="email"></div>
         <div class="fg"><label for="auth-password">비밀번호</label><input type="password" id="auth-password" required minlength="6" placeholder="6자리 이상" class="field-input" autocomplete="current-password"></div>
         <div class="fg" id="signup-nickname-group" style="display:none;"><label for="auth-nickname">닉네임</label><input type="text" id="auth-nickname" placeholder="은채아빠" class="field-input"></div>
+        <label class="consent" id="signup-consent-group" style="display:none;">
+          <input type="checkbox" id="signup-consent">
+          <span><b>(필수)</b> 만 14세 이상이며, <a href="terms.html" target="_blank" rel="noopener">이용약관</a>과 <a href="privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>에 동의해요</span>
+        </label>
         <button type="submit" id="auth-submit-btn" class="btn btn-accent btn-block" style="margin-top:4px;">로그인</button>
+        <div id="forgot-pw-row" style="text-align:center;"><button type="button" class="link-btn muted" onclick="sendPasswordReset()">비밀번호를 잊으셨나요?</button></div>
       </form>
     </div>
   </div>
@@ -1182,6 +1211,7 @@
         <div class="fg"><label for="profile-name-input">닉네임</label><input type="text" id="profile-name-input" required class="field-input"></div>
         <div class="fg"><label for="profile-bio-input">소개</label><input type="text" id="profile-bio-input" placeholder="2027 춘천마라톤 서브4 목표" class="field-input"></div>
         <button type="submit" class="btn btn-accent btn-block">저장</button>
+        <div style="text-align:center;"><button type="button" class="link-btn muted" onclick="openDeleteAccount()">회원 탈퇴</button></div>
       </form>
     </div>
   </div>
@@ -1440,6 +1470,68 @@
     </div>
   </div>
 
+  <!-- 게시물 · 러너 더보기 -->
+  <div id="post-menu" class="overlay bottom" style="display:none; z-index:98;" onclick="if(event.target===this)closePostMenu()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pm-title">
+      <div class="sheet-grip"></div>
+      <div class="sheet-sub" id="pm-title" style="text-align:center;"></div>
+      <button class="menu-item danger" id="pm-report" onclick="openReportModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg><span>신고하기</span></button>
+      <button class="menu-item" id="pm-block"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg><span>이 러너 차단하기</span></button>
+      <button type="button" class="sheet-cancel" onclick="closePostMenu()">닫기</button>
+    </div>
+  </div>
+
+  <!-- 신고 -->
+  <div id="report-modal" class="overlay bottom" style="display:none; z-index:99;" onclick="if(event.target===this)closeReportModal()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rp-title" style="max-height: 92vh; overflow-y: auto;">
+      <div class="sheet-grip"></div>
+      <div class="sheet-title" id="rp-title">신고하기</div>
+      <div class="sheet-sub"><span id="rp-target"></span>을(를) 신고하는 이유를 골라주세요. 신고한 사람은 상대방에게 알려지지 않아요.</div>
+      <div id="rp-reasons" class="rp-reasons"></div>
+      <textarea id="rp-detail" rows="3" maxlength="500" class="field-input" placeholder="자세한 내용 (선택)" style="margin-top:10px;"></textarea>
+      <button type="button" class="btn btn-accent" id="rp-submit" style="width:100%; margin-top:12px;" onclick="submitReport()">신고하기</button>
+      <button type="button" class="sheet-cancel" onclick="closeReportModal()">취소</button>
+    </div>
+  </div>
+
+  <!-- 회원 탈퇴 -->
+  <div id="delete-account-modal" class="overlay bottom" style="display:none; z-index:99;" onclick="if(event.target===this)closeDeleteAccount()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="da-title" style="max-height: 92vh; overflow-y: auto;">
+      <div class="sheet-grip"></div>
+      <div class="sheet-title" id="da-title">회원 탈퇴</div>
+      <div class="da-box">
+        <p>탈퇴하면 아래 내용이 <b>바로, 모두 삭제</b>되고 되돌릴 수 없어요.</p>
+        <ul>
+          <li>완주 기록, 기록증, 대회 사진</li>
+          <li>프로필과 프로필 사진</li>
+          <li>좋아요, 팔로우·팔로워, 목표, 차단 목록</li>
+          <li>로그인 계정(이메일)</li>
+        </ul>
+        <p class="sub">기록증과 사진을 남기고 싶다면 먼저 [이미지 저장]으로 내려받아 주세요. 접수된 신고 내용은 서비스 운영을 위해 작성자 정보 없이 남을 수 있어요.</p>
+      </div>
+      <label class="fg-label" for="da-confirm" style="display:block; margin: 14px 4px 6px;">계속하려면 <b>탈퇴</b>라고 입력해주세요</label>
+      <input type="text" id="da-confirm" class="field-input" autocomplete="off" oninput="onDeleteConfirmInput(this)" placeholder="탈퇴">
+      <div class="pd-src" id="da-status" style="text-align:center;"></div>
+      <button type="button" class="btn btn-danger" id="da-submit" style="width:100%; margin-top:6px;" onclick="deleteMyAccount()" disabled>모든 데이터 삭제하고 탈퇴</button>
+      <button type="button" class="sheet-cancel" onclick="closeDeleteAccount()">취소</button>
+    </div>
+  </div>
+
+  <!-- 새 비밀번호 (재설정 메일 링크로 들어왔을 때) -->
+  <div id="new-password-modal" class="overlay" style="display:none; z-index:130;">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="np-title">
+      <div class="dialog-head">
+        <div class="dialog-title" id="np-title">새 비밀번호 정하기</div>
+        <button class="icon-btn" aria-label="닫기" onclick="closeNewPassword()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <form onsubmit="submitNewPassword(event)" style="display:flex; flex-direction:column; gap:14px;">
+        <div class="fg"><label for="np-password">새 비밀번호</label><input type="password" id="np-password" minlength="6" required placeholder="6자리 이상" class="field-input" autocomplete="new-password"></div>
+        <div class="fg"><label for="np-password2">새 비밀번호 확인</label><input type="password" id="np-password2" minlength="6" required class="field-input" autocomplete="new-password"></div>
+        <button type="submit" class="btn btn-accent btn-block">비밀번호 바꾸기</button>
+      </form>
+    </div>
+  </div>
+
   <!-- 내 프로필 메뉴 -->
   <div id="profile-menu" class="overlay bottom" style="display:none;" onclick="if(event.target===this)closeProfileMenu()">
     <div class="sheet" role="dialog" aria-modal="true" aria-label="메뉴">
@@ -1453,6 +1545,8 @@
       <button class="menu-item" id="menu-install" onclick="closeProfileMenu(); installApp();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>홈 화면에 앱 설치</button>
       <button class="menu-item" id="menu-login" onclick="closeProfileMenu(); openAuthModal('login');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M14 16l4-4-4-4M18 12H8"/></svg>로그인 / 가입</button>
       <button class="menu-item" id="menu-profile-edit" onclick="closeProfileMenu(); openProfileModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>프로필 수정</button>
+      <button class="menu-item" onclick="closeProfileMenu(); openPolicyPage('terms');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>이용약관</button>
+      <button class="menu-item" onclick="closeProfileMenu(); openPolicyPage('privacy');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>개인정보처리방침</button>
       <button class="menu-item danger" id="menu-logout" onclick="closeProfileMenu(); handleAuthBtnClick();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></svg>로그아웃</button>
       <button type="button" class="sheet-cancel" onclick="closeProfileMenu()">닫기</button>
     </div>
@@ -1685,6 +1779,7 @@
         }
 
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'PASSWORD_RECOVERY') setTimeout(openNewPassword, 300);
           const prevId = currentUser ? currentUser.id : null;
           const nextId = session && session.user ? session.user.id : null;
           if (session && session.user) {
@@ -1723,7 +1818,7 @@
           const defAvatar = null;
           const { data: inserted } = await supabaseClient
             .from('profiles')
-            .upsert({ id: userId, email: currentUser.email, nickname: defNickname, avatar_url: defAvatar, bio: "" })
+            .upsert({ id: userId, nickname: defNickname, avatar_url: defAvatar, bio: "" })
             .select()
             .single();
           currentProfile = inserted || { id: userId, nickname: defNickname, avatar_url: defAvatar, bio: "" };
@@ -1767,12 +1862,16 @@
         title.textContent = "로그인";
         submitBtn.textContent = "로그인";
         nicknameGroup.style.display = "none";
+        document.getElementById('signup-consent-group').style.display = 'none';
+        document.getElementById('forgot-pw-row').style.display = '';
       } else {
         signupTab.classList.add("active");
         loginTab.classList.remove("active");
         title.textContent = "회원가입";
         submitBtn.textContent = "가입하기";
         nicknameGroup.style.display = "block";
+        document.getElementById('signup-consent-group').style.display = '';
+        document.getElementById('forgot-pw-row').style.display = 'none';
       }
     }
 
@@ -1787,6 +1886,10 @@
       const password = document.getElementById("auth-password").value;
       const nickname = document.getElementById("auth-nickname").value.trim() || email.split('@')[0];
 
+      if (authMode !== 'login' && !document.getElementById('signup-consent').checked) {
+        alert('만 14세 이상이며, 이용약관과 개인정보처리방침에 동의해야 가입할 수 있어요.');
+        return;
+      }
       const submitBtn = document.getElementById("auth-submit-btn");
       submitBtn.disabled = true;
       submitBtn.textContent = "처리 중...";
@@ -1807,7 +1910,6 @@
           if (data.user) {
             await supabaseClient.from('profiles').upsert({
               id: data.user.id,
-              email: email,
               nickname: nickname,
               avatar_url: null,
               bio: ""
@@ -1965,6 +2067,8 @@
     const ICON_STAR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
     const ICON_PLUS = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
     const ICON_MULTI = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" fill="rgba(23,23,26,0.35)"/><path d="M16 4H6a2 2 0 0 0-2 2v10"/></svg>';
+    const ICON_MORE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+    const ICON_LOCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
     const ICON = {
       heart: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>',
       send: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3L10 14"/><path d="M21 3l-7 18-4-7-7-4z"/></svg>',
@@ -1988,7 +2092,8 @@
         id: row.id, userId: row.user_id, name: row.name || '', category: row.category,
         distanceKm: Number(row.distance_km) || 0, hours: num(row.hours), minutes: num(row.minutes), seconds: num(row.seconds),
         date: row.date || '', bib: row.bib || '', notes: row.notes || '',
-        certImageUrl: row.cert_image_url || null, hasCert: Boolean(row.cert_image_url)
+        certImageUrl: row.cert_image_url || null, hasCert: Boolean(row.cert_image_url),
+        isPrivate: Boolean(row.is_private)
       };
     }
     function shortTime(r) {
@@ -2215,6 +2320,7 @@
               </span>
             </button>
             ${showFollow ? `<button class="follow-link" onclick="toggleFollow(${jsArg(r.userId)}, this)">팔로우</button>` : ''}
+            ${(!isSelf && r.userId) ? `<button class="icon-btn more-btn" aria-label="더보기" onclick="openPostMenu(${jsArg(r.id)}, ${jsArg(r.userId)})">${ICON_MORE}</button>` : ''}
           </div>
           ${mediaHtml(r, isPb)}
           ${goalHit ? `<div class="goal-hit"><span class="goal-hit-chip">목표 달성</span><span class="num">${CAT_SHORT[goalHit.category]} 목표 ${pdFmtTime(goalHit.target)}${josaEul(pdFmtTime(goalHit.target))} 넘었어요</span></div>` : ''}
@@ -2234,13 +2340,13 @@
 
     function renderFeedUI() {
       const el = document.getElementById("feed-list");
-      let list = feedRecords;
+      let list = feedRecords.filter(r => !r.is_private && !isBlocked(r.user_id));
       if (currentFeedFilter === 'following') {
         if (!currentUser) {
           el.innerHTML = emptyHtml('로그인이 필요해요', '팔로우한 러너의 완주 소식을 모아볼 수 있어요.', '로그인', "openAuthModal('login')");
           return;
         }
-        list = feedRecords.filter(r => r.user_id && followingIds.has(r.user_id));
+        list = list.filter(r => r.user_id && followingIds.has(r.user_id));
         if (!list.length) {
           el.innerHTML = emptyHtml('아직 팔로우한 러너가 없어요', '러너를 팔로우하면 완주 소식이 여기에 모여요.', '러너 찾기', "switchMainView('runners')");
           return;
@@ -2339,7 +2445,7 @@
 
     function renderRankingUI() {
       const el = document.getElementById("ranking-list");
-      let recs = allRankingRecords;
+      let recs = allRankingRecords.filter(r => !r.is_private && !isBlocked(r.user_id));
       if (currentRankScope === 'following') {
         if (!currentUser) {
           el.innerHTML = emptyHtml('로그인이 필요해요', '팔로우한 러너들과 기록을 비교할 수 있어요.', '로그인', "openAuthModal('login')");
@@ -2390,7 +2496,7 @@
       if (!supabaseClient) { el.innerHTML = emptyHtml('연결할 수 없어요', '인터넷 연결을 확인하고 다시 열어주세요.'); return; }
       try {
         const [res] = await Promise.all([
-          supabaseClient.from('profiles').select('*').order('created_at', { ascending: false }).limit(200),
+          supabaseClient.from('profiles').select('id, nickname, avatar_url, bio, created_at').order('created_at', { ascending: false }).limit(200),
           fetchFollowingList()
         ]);
         if (res.error || !res.data) { el.innerHTML = emptyHtml('러너 목록을 불러오지 못했어요', '잠시 후 다시 시도해주세요.'); return; }
@@ -2403,7 +2509,7 @@
     function renderRunnersList() {
       const el = document.getElementById("runners-list");
       const kw = (document.getElementById("runner-search-input").value || "").trim().toLowerCase();
-      const list = allDirectoryRunners.filter(r => !kw || (r.nickname || '').toLowerCase().includes(kw) || (r.bio || '').toLowerCase().includes(kw));
+      const list = allDirectoryRunners.filter(r => !isBlocked(r.id)).filter(r => !kw || (r.nickname || '').toLowerCase().includes(kw) || (r.bio || '').toLowerCase().includes(kw));
       if (!list.length) { el.innerHTML = emptyHtml(kw ? '찾는 러너가 없어요' : '아직 가입한 러너가 없어요', kw ? '다른 닉네임으로 검색해보세요.' : ''); return; }
       el.innerHTML = list.map(r => {
         const isSelf = currentUser && r.id === currentUser.id;
@@ -2454,6 +2560,7 @@
             <button class="tile" ${action ? `onclick="${action}"` : 'disabled'} aria-label="${esc(r.name)} ${shortTime(r)}">
               ${isSafeUrl(r.certImageUrl) ? `<img src="${safeUrl(certThumbUrl(r.certImageUrl, isSelf ? (currentUser && currentUser.id) : r.userId))}" data-full="${safeUrl(r.certImageUrl)}" ${isSelf ? 'data-own="1"' : ''} onerror="certThumbFallback(this)" alt="" loading="lazy" decoding="async">` : `<span class="tile-text">${esc(r.name)}</span>`}
               <span class="tile-label num">${CAT_SHORT[bucket] || esc(r.category || '')} ${shortTime(r)}</span>
+              ${(isSelf && r.isPrivate) ? `<span class="tile-lock" aria-label="나만 보기">${ICON_LOCK}</span>` : ''}
               ${(recordPhotos.get(r.id) || []).length ? `<span class="tile-multi" aria-label="사진 ${(recordPhotos.get(r.id) || []).length}장">${ICON_MULTI}</span>` : ''}
             </button>`;
         }).join('')}</div>`;
@@ -2464,7 +2571,7 @@
         return `
           <div class="rec-row">
             <div class="row-main" ${action ? `role="button" tabindex="0" onclick="${action}"` : ''}>
-              <div class="row-title"><span class="tag">${CAT_SHORT[bucket] || esc(r.category || '')}</span>${esc(r.name)}</div>
+              <div class="row-title"><span class="tag">${CAT_SHORT[bucket] || esc(r.category || '')}</span>${esc(r.name)}${(isSelf && r.isPrivate) ? `<span class="lock-tag">${ICON_LOCK}나만 보기</span>` : ''}</div>
               <div class="row-sub">${esc(r.date)}${r.bib ? ` · 배번 ${esc(r.bib)}` : ''}</div>
               ${r.notes ? `<div class="rec-notes">${esc(r.notes)}</div>` : ''}
             </div>
@@ -2486,8 +2593,20 @@
       let buttons = '';
       if (o.isSelf) {
         buttons = `<div class="pf-buttons"><button class="btn btn-soft" onclick="openProfileModal()">프로필 수정</button><button class="btn btn-accent" onclick="openPbModal()">PB 카드 공유</button></div>`;
+      } else if (currentUser && isBlocked(o.uid)) {
+        buttons = `<div class="pf-buttons"><button class="btn btn-soft" onclick="unblockUser(${jsArg(o.uid)})">차단 해제</button><button class="btn btn-soft more-wide" aria-label="더보기" onclick="openPostMenu(null, ${jsArg(o.uid)})">${ICON_MORE}</button></div>`;
       } else if (currentUser) {
-        buttons = `<div class="pf-buttons"><button class="btn ${following ? 'btn-soft' : 'btn-accent'}" onclick="toggleFollow(${jsArg(o.uid)}, this)">${following ? '팔로잉' : '팔로우'}</button></div>`;
+        buttons = `<div class="pf-buttons"><button class="btn ${following ? 'btn-soft' : 'btn-accent'}" onclick="toggleFollow(${jsArg(o.uid)}, this)">${following ? '팔로잉' : '팔로우'}</button><button class="btn btn-soft more-wide" aria-label="더보기" onclick="openPostMenu(null, ${jsArg(o.uid)})">${ICON_MORE}</button></div>`;
+      }
+      if (!o.isSelf && currentUser && isBlocked(o.uid)) {
+        return `
+        <div class="pf-top">
+          <img class="avatar av-80" src="${avatarOf(p, o.uid)}" alt="${nick} 프로필 사진">
+          <div class="pf-stats"></div>
+        </div>
+        ${o.showName ? `<div class="pf-name">${nick}</div>` : ''}
+        ${buttons}
+        ${emptyHtml('차단한 러너예요', '차단을 해제하면 기록을 다시 볼 수 있어요.')}`;
       }
       return `
         <div class="pf-top">
@@ -2915,6 +3034,7 @@
       records.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
       loadPhotosFor(records.map(r => r.id)).then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
       loadMyGoals().then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
+      loadMyBlocks().then(changed => { if (changed) refreshCurrentView(); });
       if (currentMainView === 'profile') renderProfile(false);
       if (otherRunner && currentUser && otherRunner.id === currentUser.id) renderOtherRunner();
     }
@@ -2991,6 +3111,7 @@
       updateCertPreviewUI(null);
       clearOcrMarks();
       resetFormPhotos([]);
+      document.getElementById('form-private').checked = false;
       document.getElementById("input-modal").style.display = "flex";
       document.querySelector('#input-modal .page-body').scrollTop = 0;
       updateAutoPace();
@@ -3012,6 +3133,7 @@
       document.getElementById("form-notes").value = rec.notes || "";
       selectCategory(rec.category, rec.distanceKm);
       resetFormPhotos([]);
+      document.getElementById('form-private').checked = Boolean(rec.isPrivate);
       await loadPhotosFor([rec.id]);
       resetFormPhotos(recordPhotos.get(rec.id) || []);
       if (rec.hasCert) {
@@ -3093,16 +3215,25 @@
           bib: document.getElementById("form-bib").value.trim(),
           notes: document.getElementById("form-notes").value.trim(),
           certImageUrl: finalCertUrl,
-          hasCert: Boolean(finalCertUrl)
+          hasCert: Boolean(finalCertUrl),
+          isPrivate: document.getElementById('form-private').checked
         };
 
         let error = null;
         if (supabaseClient) {
-          ({ error } = await supabaseClient.from('marathon_records').upsert({
+          const row = {
             id: recData.id, user_id: currentUser.id, name: recData.name, category: recData.category,
             distance_km: recData.distanceKm, hours: h, minutes: m, seconds: s, pace: recData.pace,
-            date: recData.date, bib: recData.bib, notes: recData.notes, cert_image_url: recData.certImageUrl
-          }, { onConflict: 'id' }));
+            date: recData.date, bib: recData.bib, notes: recData.notes, cert_image_url: recData.certImageUrl,
+            is_private: recData.isPrivate
+          };
+          ({ error } = await supabaseClient.from('marathon_records').upsert(row, { onConflict: 'id' }));
+          // 나만 보기 칸이 아직 없을 때 (SQL 실행 전): 공개 기록으로 저장
+          if (error && /is_private/.test(error.message || '')) {
+            delete row.is_private;
+            ({ error } = await supabaseClient.from('marathon_records').upsert(row, { onConflict: 'id' }));
+            if (!error && recData.isPrivate) { recData.isPrivate = false; alert('나만 보기 기능이 아직 준비되지 않아서 공개 기록으로 저장했어요. (Supabase에 safety_setup.sql 실행 필요)'); }
+          }
         }
         if (error) { alert("저장하지 못했어요: " + error.message); return; }
 
@@ -4113,6 +4244,215 @@
     }
 
     // ========================================================
+    // 안전 기능: 신고 · 차단 · 회원 탈퇴 · 비밀번호 재설정
+    // ========================================================
+    let myBlocks = new Set();            // 내가 차단한 러너
+    let blocksLoadedFor = null;
+    let reportTarget = null;             // { type: 'record'|'user', id, userId, label }
+    const REPORT_REASONS = ['부적절하거나 불쾌한 사진·내용', '스팸·광고', '다른 사람을 사칭해요', '기록이 조작된 것 같아요', '기타'];
+
+    function isMissingRelation(error, name) {
+      const m = String((error && (error.message || error.code)) || '');
+      return new RegExp(name, 'i').test(m) && /exist|find|schema cache|42P01|PGRST20|42883/i.test(m);
+    }
+
+    async function loadMyBlocks(force) {
+      if (!currentUser) { myBlocks = new Set(); blocksLoadedFor = null; return false; }
+      if (!supabaseClient || (!force && blocksLoadedFor === currentUser.id)) return false;
+      try {
+        const { data, error } = await supabaseClient.from('blocks').select('blocked_id').eq('blocker_id', currentUser.id);
+        if (error) return false;
+        myBlocks = new Set((data || []).map(r => r.blocked_id));
+        blocksLoadedFor = currentUser.id;
+        return true;
+      } catch (e) { return false; }
+    }
+    function isBlocked(uid) { return Boolean(uid && myBlocks.has(uid)); }
+
+    // ---------- 게시물 / 러너 "더보기" 메뉴 ----------
+    function openPostMenu(recId, userId) {
+      const p = profileOf(userId);
+      reportTarget = recId
+        ? { type: 'record', id: recId, userId, label: `${p.nickname || '러너'}님의 기록` }
+        : { type: 'user', id: userId, userId, label: `${p.nickname || '러너'}님` };
+      document.getElementById('pm-title').textContent = reportTarget.label;
+      document.querySelector('#pm-report span').textContent = recId ? '이 기록 신고하기' : '이 러너 신고하기';
+      const blocked = isBlocked(userId);
+      document.querySelector('#pm-block span').textContent = blocked ? '차단 해제' : '이 러너 차단하기';
+      document.getElementById('pm-block').onclick = () => { closePostMenu(); blocked ? unblockUser(userId) : blockUser(userId); };
+      document.getElementById('post-menu').style.display = 'flex';
+    }
+    function closePostMenu() { document.getElementById('post-menu').style.display = 'none'; }
+
+    // ---------- 신고 ----------
+    function openReportModal() {
+      closePostMenu();
+      if (!requireLogin('신고하려면 먼저 로그인해주세요.')) return;
+      if (!reportTarget) return;
+      document.getElementById('rp-target').textContent = reportTarget.label;
+      document.getElementById('rp-reasons').innerHTML = REPORT_REASONS.map((r, i) => `
+        <label class="rp-reason"><input type="radio" name="rp-reason" value="${esc(r)}" ${i === 0 ? 'checked' : ''}><span>${esc(r)}</span></label>`).join('');
+      document.getElementById('rp-detail').value = '';
+      document.getElementById('report-modal').style.display = 'flex';
+    }
+    function closeReportModal() { document.getElementById('report-modal').style.display = 'none'; }
+    async function submitReport() {
+      if (!reportTarget || !currentUser) return;
+      const reason = (document.querySelector('input[name="rp-reason"]:checked') || {}).value || '기타';
+      const detail = document.getElementById('rp-detail').value.trim().slice(0, 500);
+      const btn = document.getElementById('rp-submit');
+      btn.disabled = true;
+      try {
+        const { error } = await supabaseClient.from('reports').insert({
+          reporter_id: currentUser.id, target_type: reportTarget.type, target_id: reportTarget.id,
+          target_user_id: reportTarget.userId || null, reason, detail: detail || null
+        });
+        if (error) {
+          alert(isMissingRelation(error, 'reports') ? '신고 기능이 아직 준비되지 않았어요. (Supabase에 safety_setup.sql 실행 필요)' : '신고하지 못했어요: ' + error.message);
+          return;
+        }
+        closeReportModal();
+        const uid = reportTarget.userId;
+        if (uid && !isBlocked(uid) && confirm('신고가 접수됐어요. 확인 후 조치할게요.\n\n이 러너의 게시물을 더 이상 보지 않도록 차단할까요?')) await blockUser(uid, true);
+      } finally { btn.disabled = false; }
+    }
+
+    // ---------- 차단 ----------
+    async function blockUser(uid, skipConfirm) {
+      if (!requireLogin('차단하려면 먼저 로그인해주세요.')) return;
+      if (!uid || uid === currentUser.id) return;
+      const nick = profileOf(uid).nickname || '러너';
+      if (!skipConfirm && !confirm(`${nick}님을 차단할까요?\n\n서로의 팔로우가 끊기고, ${nick}님의 기록이 피드·랭킹·러너 찾기에서 보이지 않아요. 상대방에게는 알리지 않아요.`)) return;
+      const { error } = await supabaseClient.rpc('pbpb_block_user', { p_target: uid });
+      if (error) {
+        alert(isMissingRelation(error, 'pbpb_block_user|blocks') ? '차단 기능이 아직 준비되지 않았어요. (Supabase에 safety_setup.sql 실행 필요)' : '차단하지 못했어요: ' + error.message);
+        return;
+      }
+      myBlocks.add(uid);
+      followingIds.delete(uid);
+      if (otherRunner && otherRunner.id === uid) renderOtherRunner();
+      document.getElementById('record-detail-modal').style.display = 'none';
+      refreshCurrentView();
+      alert(`${nick}님을 차단했어요. 러너 기록실의 ⋯ 메뉴에서 언제든 해제할 수 있어요.`);
+    }
+    async function unblockUser(uid) {
+      if (!currentUser || !uid) return;
+      const { error } = await supabaseClient.from('blocks').delete().eq('blocker_id', currentUser.id).eq('blocked_id', uid);
+      if (error) { alert('차단을 해제하지 못했어요: ' + error.message); return; }
+      myBlocks.delete(uid);
+      if (otherRunner && otherRunner.id === uid) renderOtherRunner();
+      refreshCurrentView();
+    }
+
+    // ---------- 회원 탈퇴 ----------
+    function openDeleteAccount() {
+      if (!currentUser) return;
+      closeProfileModal();
+      document.getElementById('da-confirm').value = '';
+      document.getElementById('da-submit').disabled = true;
+      document.getElementById('delete-account-modal').style.display = 'flex';
+    }
+    function closeDeleteAccount() { document.getElementById('delete-account-modal').style.display = 'none'; }
+    function onDeleteConfirmInput(el) { document.getElementById('da-submit').disabled = el.value.trim() !== '탈퇴'; }
+
+    async function listAllFiles(bucket, prefix) {
+      const out = [];
+      const walk = async (dir, depth) => {
+        for (let offset = 0; ; offset += 100) {
+          const { data, error } = await supabaseClient.storage.from(bucket).list(dir, { limit: 100, offset });
+          if (error || !data || !data.length) return;
+          for (const f of data) {
+            const p = `${dir}/${f.name}`;
+            if (f.id) out.push(p);
+            else if (depth < 3) await walk(p, depth + 1);   // 폴더
+          }
+          if (data.length < 100) return;
+        }
+      };
+      await walk(prefix, 0);
+      return out;
+    }
+    function storagePathOf(url, bucket) {
+      const m = String(url || '').match(new RegExp(`/storage/v1/object/public/${bucket}/([^?#]+)`));
+      return m ? decodeURIComponent(m[1]) : null;
+    }
+
+    async function deleteMyAccount() {
+      if (!currentUser || !supabaseClient) return;
+      const uid = currentUser.id;
+      const btn = document.getElementById('da-submit');
+      const status = document.getElementById('da-status');
+      btn.disabled = true;
+      try {
+        // 1) 서버 준비 확인 (준비 안 됐으면 아무것도 지우지 않는다)
+        status.textContent = '확인하는 중…';
+        const dry = await supabaseClient.rpc('pbpb_delete_my_account', { p_dry_run: true });
+        if (dry.error) {
+          alert(isMissingRelation(dry.error, 'pbpb_delete_my_account') ? '탈퇴 기능이 아직 준비되지 않았어요. (Supabase에 safety_setup.sql 실행 필요)' : '탈퇴를 진행하지 못했어요: ' + dry.error.message);
+          return;
+        }
+        // 2) 사진 파일 삭제: 내 폴더 + 예전에 폴더 없이 올린 기록증·프로필 사진
+        status.textContent = '사진을 지우는 중…';
+        const legacyCerts = records.map(r => storagePathOf(r.certImageUrl, 'certificates')).filter(p => p && !p.startsWith(uid + '/'));
+        const legacyAvatar = currentProfile && storagePathOf(currentProfile.avatar_url, 'avatars');
+        const plan = {
+          certificates: [...(await listAllFiles('certificates', uid)), ...legacyCerts],
+          avatars: [...(await listAllFiles('avatars', uid)), ...(legacyAvatar && !legacyAvatar.startsWith(uid + '/') ? [legacyAvatar] : [])],
+          'race-photos': await listAllFiles('race-photos', uid)
+        };
+        for (const [bucket, paths] of Object.entries(plan)) {
+          for (let i = 0; i < paths.length; i += 100) await supabaseClient.storage.from(bucket).remove(paths.slice(i, i + 100)).catch(() => {});
+        }
+        // 3) 기록 · 좋아요 · 팔로우 · 목표 · 계정 삭제
+        status.textContent = '계정을 지우는 중…';
+        const { error } = await supabaseClient.rpc('pbpb_delete_my_account', { p_dry_run: false });
+        if (error) { alert('계정을 지우지 못했어요: ' + error.message); return; }
+        // 4) 이 기기에 남은 내용 정리
+        try { localStorage.removeItem('marathon_records_cloud_cache'); } catch (e) {}
+        try { if (typeof db !== 'undefined' && db) { const tx = db.transaction(db.objectStoreNames, 'readwrite'); [...db.objectStoreNames].forEach(n => tx.objectStore(n).clear()); } } catch (e) {}
+        await supabaseClient.auth.signOut().catch(() => {});
+        closeDeleteAccount();
+        alert('탈퇴가 완료됐어요. 그동안 PBPB와 함께 달려주셔서 고마워요.');
+        location.reload();
+      } catch (e) {
+        console.error('delete account:', e);
+        alert('탈퇴 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.');
+      } finally {
+        btn.disabled = false;
+        status.textContent = '';
+      }
+    }
+
+    // ---------- 비밀번호 재설정 ----------
+    async function sendPasswordReset() {
+      const email = document.getElementById('auth-email').value.trim() || prompt('가입한 이메일 주소를 입력해주세요.') || '';
+      if (!email) return;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert('이메일 주소를 다시 확인해주세요.'); return; }
+      const redirectTo = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : undefined;
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
+      if (error) { alert('메일을 보내지 못했어요: ' + error.message); return; }
+      alert(`${email}로 비밀번호 재설정 메일을 보냈어요.\n메일의 링크를 누르면 새 비밀번호를 정할 수 있어요. (스팸함도 확인해주세요)`);
+    }
+    function openNewPassword() {
+      document.getElementById('np-password').value = '';
+      document.getElementById('np-password2').value = '';
+      document.getElementById('new-password-modal').style.display = 'flex';
+    }
+    function closeNewPassword() { document.getElementById('new-password-modal').style.display = 'none'; }
+    async function submitNewPassword(e) {
+      e.preventDefault();
+      const a = document.getElementById('np-password').value, b = document.getElementById('np-password2').value;
+      if (a.length < 6) { alert('비밀번호는 6자리 이상으로 정해주세요.'); return; }
+      if (a !== b) { alert('두 비밀번호가 서로 달라요.'); return; }
+      const { error } = await supabaseClient.auth.updateUser({ password: a });
+      if (error) { alert('비밀번호를 바꾸지 못했어요: ' + error.message); return; }
+      closeNewPassword();
+      alert('비밀번호를 바꿨어요.');
+    }
+
+    function openPolicyPage(name) { window.open(`${name}.html`, '_blank', 'noopener'); }
+
+    // ========================================================
     // 시작
     // ========================================================
     window.addEventListener("DOMContentLoaded", async () => {
@@ -4122,6 +4462,9 @@
       document.addEventListener("keydown", (e) => {
         if (e.key !== "Escape") return;
         if (document.getElementById('photo-viewer').style.display === 'flex') { closePhotoViewer(); return; }
+        for (const [id, fn] of [['report-modal', closeReportModal], ['post-menu', closePostMenu], ['delete-account-modal', closeDeleteAccount], ['new-password-modal', closeNewPassword]]) {
+          if (document.getElementById(id).style.display === 'flex') { fn(); return; }
+        }
         if (document.getElementById('install-guide').style.display === 'flex') { closeInstallGuide(); return; }
         if (document.getElementById('goal-celebrate').style.display === 'flex') { closeGoalCelebrate(); return; }
         if (document.getElementById('goal-modal').style.display === 'flex') { closeGoalModal(); return; }
@@ -4183,7 +4526,8 @@
               bib: row.bib || "",
               notes: row.notes || "",
               certImageUrl: row.cert_image_url || null,
-              hasCert: Boolean(row.cert_image_url)
+              hasCert: Boolean(row.cert_image_url),
+              isPrivate: Boolean(row.is_private)
             }));
             if (statusBadge) statusBadge.innerHTML = "☁️ 클라우드 동기화 완료";
             sortAndRenderApp();
