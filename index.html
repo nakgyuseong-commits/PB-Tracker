@@ -1824,7 +1824,11 @@
           updateAuthUI();
         }
 
-        if (PBPB_RECOVERY && currentUser) setTimeout(openNewPassword, 400);
+        if (PBPB_RECOVERY) {
+          // 한 번 확인했으면 주소의 재설정 표시를 지운다 (다시 열 때마다 창이 뜨지 않게)
+          try { history.replaceState(history.state, '', location.pathname); } catch (e) {}
+          if (currentUser) setTimeout(openNewPassword, 400);
+        }
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
           if (event === 'PASSWORD_RECOVERY') setTimeout(openNewPassword, 300);
           const prevId = currentUser ? currentUser.id : null;
