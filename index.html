@@ -998,14 +998,44 @@
     .t1 { --tb: #EEEDEA; --tf: #5F5E5A; } .t2 { --tb: #E3F0E6; --tf: #1D5B36; } .t3 { --tb: #DDEBF7; --tf: #164A73; }
     .t4 { --tb: #FDF1EC; --tf: #A93716; } .t5 { --tb: #C9431B; --tf: #FFFFFF; } .t6 { --tb: #3F3482; --tf: #FFFFFF; } .t7 { --tb: #17171A; --tf: #F5C451; }
     .tier-chip { background: var(--tb); color: var(--tf); }
-    .ag-badge { margin: 8px 16px 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 8px; border-radius: 999px; background: var(--tb, var(--accent-soft)); color: var(--tf, #8A2E12); font-size: 12.5px; max-width: calc(100% - 32px); }
-    .ag-badge b { font-size: 13.5px; font-weight: 800; flex-shrink: 0; }
-    .ag-badge span:last-child { opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pf-name-row { display: flex; align-items: center; gap: 6px; padding: 12px 16px 0; min-width: 0; }
+    .pf-name-row .pf-name { padding: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ag-badge { display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 7px 0 4px; border: 0; border-radius: 999px; background: var(--tb, var(--accent-soft)); color: var(--tf, #8A2E12); font-size: 12px; line-height: 1; flex-shrink: 0; cursor: pointer; }
+    .ag-badge b { font-size: 12px; font-weight: 800; }
+    .ag-badge .tier-dot { width: 11px; height: 11px; }
+    .pf-name-row .pf-name { line-height: 20px; }
+    .ag-badge.big { height: auto; padding: 8px 16px 8px 10px; gap: 6px; cursor: default; }
+    .ag-badge.big b { font-size: 18px; }
+    .ag-badge.big .tier-dot { width: 20px; height: 20px; }
+    .ts-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 4px 4px 14px; }
+    .ts-desc { font-size: 15px; }
+    .ts-score { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .ts-score > div { background: var(--surface); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .ts-score .ag-v small { font-size: 12px; font-weight: 600; color: var(--sub); }
+    .ts-ladder { margin-top: 12px; display: flex; flex-direction: column; gap: 2px; }
+    .ts-ladder > div { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 10px; font-size: 13px; color: var(--sub); }
+    .ts-ladder > div.on { background: var(--surface); color: var(--text); font-weight: 700; }
     .tier-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--tf); opacity: 0.9; flex-shrink: 0; -webkit-mask: radial-gradient(circle at 50% 50%, #000 38%, transparent 40%), linear-gradient(#000, #000); -webkit-mask-composite: xor; mask-composite: exclude; }
     .ag-legend-top { margin-bottom: 6px; }
     .ag-tiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
     .ag-tiers > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
     .ag-card-head .tier-chip { margin-right: 2px; }
+    /* 홈: 비로그인 환영 카드 · 러너 소식 */
+    .welcome { margin: 20px 16px 0; padding: 24px 20px; border-radius: 20px; background: var(--accent-soft); }
+    .welcome h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.35; }
+    .welcome ul { margin: 16px 0 20px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; font-size: clamp(12.5px, 3.6vw, 14.5px); letter-spacing: -0.2px; }
+    .welcome li { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+    .welcome li span { overflow: hidden; text-overflow: ellipsis; }
+    .welcome li b { width: 12px; flex-shrink: 0; }
+    .welcome li b { color: var(--accent); }
+    .welcome .link-btn { display: block; margin: 14px auto 0; color: var(--sub); font-weight: 600; }
+    .news-row { margin: 18px 16px 0; width: calc(100% - 32px); display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #FFFFFF; text-align: left; }
+    .news-avs { display: flex; flex-shrink: 0; }
+    .news-avs img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #FFFFFF; margin-left: -8px; }
+    .news-avs img:first-child { margin-left: 0; }
+    .news-text { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.4; }
+    .news-text small { display: block; color: var(--sub); font-size: 12px; }
+    .news-row svg { color: var(--muted); flex-shrink: 0; }
     .pd-how { margin: 20px 16px 0; border-radius: 14px; background: var(--surface); }
     .pd-how summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
     .pd-how summary::-webkit-details-marker { display: none; }
@@ -1023,7 +1053,7 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <button id="topbar-title" class="topbar-logo" onclick="switchMainView('feed')" aria-label="pbpb 홈으로"><span class="logo-mark" aria-hidden="true">pb</span><span class="logo-word" aria-hidden="true">pb</span></button>
+      <button id="topbar-title" class="topbar-logo" onclick="switchMainView('profile')" aria-label="pbpb 홈(내 기록실)으로"><span class="logo-mark" aria-hidden="true">pb</span><span class="logo-word" aria-hidden="true">pb</span></button>
       <span id="topbar-label" class="topbar-label" hidden></span>
       <div class="topbar-actions">
         <button id="topbar-search" class="icon-btn" aria-label="러너 찾기" onclick="switchMainView('runners')">
@@ -1075,20 +1105,20 @@
 
   <nav class="tabbar" aria-label="주요 메뉴">
     <div class="tabbar-inner">
-      <button class="tab active" id="tab-feed" aria-label="피드" onclick="switchMainView('feed')">
+      <button class="tab active" id="tab-profile" aria-label="내 기록실" onclick="switchMainView('profile')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6h-6v6H4z"/></svg>
       </button>
-      <button class="tab" id="tab-ranking" aria-label="랭킹" onclick="switchMainView('ranking')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>
+      <button class="tab" id="tab-feed" aria-label="피드" onclick="switchMainView('feed')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><rect x="7.5" y="7" width="9" height="5.5" rx="1"/><path d="M7.5 15.5h9M7.5 18h5.5"/></svg>
       </button>
       <button class="tab tab-add" aria-label="기록 추가" onclick="openChoiceModal()">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
       </button>
+      <button class="tab" id="tab-ranking" aria-label="랭킹" onclick="switchMainView('ranking')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"/></svg>
+      </button>
       <button class="tab" id="tab-runners" aria-label="러너 찾기" onclick="switchMainView('runners')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></svg>
-      </button>
-      <button class="tab" id="tab-profile" aria-label="내 기록실" onclick="switchMainView('profile')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
       </button>
     </div>
   </nav>
@@ -1710,6 +1740,15 @@
     </div>
   </div>
 
+  <!-- 러너 등급 세부 정보 -->
+  <div id="tier-sheet" class="overlay bottom" style="display:none; z-index:97;" onclick="if(event.target===this)closeTierSheet()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="러너 등급" style="max-height: 92vh; overflow-y: auto;">
+      <div class="sheet-grip"></div>
+      <div id="tier-sheet-body"></div>
+      <button type="button" class="sheet-cancel" onclick="closeTierSheet()">닫기</button>
+    </div>
+  </div>
+
   <!-- 내 프로필 메뉴 -->
   <div id="profile-menu" class="overlay bottom" style="display:none;" onclick="if(event.target===this)closeProfileMenu()">
     <div class="sheet" role="dialog" aria-modal="true" aria-label="메뉴">
@@ -2231,7 +2270,7 @@
     // ========================================================
     // 화면 상태
     // ========================================================
-    let currentMainView = 'feed';
+    let currentMainView = 'profile';   // 첫 화면 = 내 기록실
     let currentFeedFilter = 'all';     // 'all' | 'following'
     let currentRankScope = 'all';      // 'all' | 'following'
     let currentRankCategory = 'Full';  // 'Full' | 'Half' | '10K'
@@ -2324,7 +2363,7 @@
     // ========================================================
     function updateTopbar() {
       // 왼쪽 위는 모든 탭에서 로고 고정, 그 옆에 지금 탭 이름
-      const label = { feed: '', ranking: '랭킹', runners: '러너 찾기', profile: '내 기록실' }[currentMainView] || '';
+      const label = { feed: '피드', ranking: '랭킹', runners: '러너 찾기', profile: '' }[currentMainView] || '';
       const lab = document.getElementById('topbar-label');
       lab.textContent = label;
       lab.hidden = !label;
@@ -2804,13 +2843,13 @@
             <button class="pf-stat" onclick="openFollowList(${jsArg(o.uid)}, 'following')" aria-label="팔로잉 ${o.counts.following}명 보기"><b class="num">${o.counts.following}</b><span>팔로잉</span></button>
           </div>
         </div>
-        ${o.showName ? `<div class="pf-name">${nick}</div>` : ''}
+        ${o.showName ? `<div class="pf-name-row"><div class="pf-name">${nick}</div><button type="button" class="ag-badge" id="ag-badge-${esc(o.uid)}" onclick="openTierSheet(${jsArg(o.uid)})" hidden></button></div>` : ''}
         ${p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
-        <div class="ag-badge" id="ag-badge-${esc(o.uid)}" hidden></div>
         ${buttons}
         <h2 class="section-title">${o.isSelf ? '나의 PB' : 'PB'}</h2>
         <div class="pb-tiles">${pbTilesHtml(o.recs)}</div>
         ${goalsSectionHtml(o.recs, o.goals || new Map(), o.isSelf)}
+        ${(o.isSelf && !o.inModal) ? '<div id="home-news"></div>' : ''}
         <div class="pf-tabs" role="tablist">
           <button class="pf-tab ${o.tab === 'grid' ? 'active' : ''}" role="tab" aria-selected="${o.tab === 'grid'}" onclick="setProfileTab('grid', '${scope}')">기록증</button>
           <button class="pf-tab ${o.tab === 'list' ? 'active' : ''}" role="tab" aria-selected="${o.tab === 'list'}" onclick="setProfileTab('list', '${scope}')">목록</button>
@@ -2823,11 +2862,17 @@
       updateTopbar();
       if (!currentUser) {
         root.innerHTML = `
-          <div class="login-card">
-            <h3>내 완주 기록을 한 곳에</h3>
-            <p>로그인하면 기록증과 PB를 모아보고<br>친구들과 완주를 나눌 수 있어요.</p>
-            <button class="btn btn-accent" style="width:100%;" onclick="openAuthModal('signup')">가입하기</button>
+          <div class="welcome">
+            <h3>기록증 사진 한 장으로<br>완성하는 나만의 완주 기록실</h3>
+            <ul>
+              <li><b>1</b><span>기록증만 올리면 대회명·기록·날짜 자동 정리</span></li>
+              <li><b>2</b><span>기록증·대회 사진 언제든 다운로드하고 공유</span></li>
+              <li><b>3</b><span>완주 기록으로 다른 종목 기록 예측</span></li>
+              <li><b>4</b><span>목표를 정하면 맞춤 훈련 페이스 안내</span></li>
+            </ul>
+            <button class="btn btn-accent" style="width:100%;" onclick="openAuthModal('signup')">가입하고 내 기록실 만들기</button>
             <button class="btn btn-soft" style="width:100%; margin-top:8px;" onclick="openAuthModal('login')">로그인</button>
+            <button type="button" class="link-btn" onclick="switchMainView('feed')">다른 러너들의 완주 기록 구경하기 ›</button>
           </div>`;
         return;
       }
@@ -2836,6 +2881,7 @@
         tab: profileTab, isSelf: true, showName: true, goals: myGoals
       });
       fillAgeBadge(currentUser.id);
+      fillHomeNews();
       if (refreshCounts) {
         loadFollowCounts(currentUser.id).then(c => {
           if (c.followers !== myFollowCounts.followers || c.following !== myFollowCounts.following) {
@@ -4691,7 +4737,7 @@
       const all = [...document.querySelectorAll('.overlay, .page-modal, .pviewer')];
       return list.sort((a, b) => ((parseInt(getComputedStyle(a).zIndex) || 0) - (parseInt(getComputedStyle(b).zIndex) || 0)) || (all.indexOf(a) - all.indexOf(b))).pop();
     }
-    function needsBackGuard() { return openLayers().length > 0 || currentMainView !== 'feed'; }
+    function needsBackGuard() { return openLayers().length > 0 || currentMainView !== 'profile'; }
     let backGuardActive = false;   // 지금 보호용 칸 위에 있는지 (주소 #만 바뀌는 이동과 구분하려고)
     function ensureBackGuard() {
       if (!needsBackGuard()) return;
@@ -4714,7 +4760,7 @@
       backGuardActive = false;
       const top = topLayer();
       if (top) closeLayer(top);
-      else if (currentMainView !== 'feed') switchMainView('feed');
+      else if (currentMainView !== 'profile') switchMainView('profile');
       else { history.back(); return; }   // 남아 있던 보호용 칸이었으면 한 번 더: 원래 뒤로 가기 (앱 나가기)
       setTimeout(ensureBackGuard, 0);
     });
@@ -5388,7 +5434,33 @@
     }
     function setAgRankCat(c) { agRankCat = c; loadAgRanking(); }
 
-    // ---------- 프로필 배지: 상위 n% 러너 ----------
+
+    // 배지를 누르면: 등급 세부 정보
+    function openTierSheet(uid) {
+      const b = agBadgeCache.get(uid);
+      if (!b) return;
+      const pct = Number(b.pct), t = agTier(pct);
+      const isSelf = currentUser && uid === currentUser.id;
+      const nick = isSelf ? ((currentProfile && currentProfile.nickname) || '나') : (profileOf(uid).nickname || '러너');
+      const next = agNextBand(pct);
+      document.getElementById('tier-sheet-body').innerHTML = `
+        <div class="ts-head">
+          <span class="ag-badge big t${t[3]}"><span class="tier-dot" aria-hidden="true"></span><b>${t[1]}</b></span>
+          <div class="ts-desc"><b>${esc(nick)}</b>님은 <b>${t[2]}</b> 수준이에요</div>
+        </div>
+        <div class="ts-score">
+          <div><span class="ag-k">가장 높은 종목</span><span class="ag-v">${CAT_LABEL[b.category]}</span></div>
+          <div><span class="ag-k">러너 점수</span><span class="ag-v num">${pct.toFixed(1)}<small>점</small></span></div>
+          <div><span class="ag-k">다음 등급</span><span class="ag-v">${next ? `${next[1]} <small class="num">${next[0]}점~</small>` : '최고 등급'}</span></div>
+        </div>
+        <div class="ts-ladder">${AG_TIERS.map(x => `<div class="${x === t ? 'on' : ''}"><span class="tier-chip t${x[3]}">${x[1]}</span><span>${x[2]}</span><span class="num">${x[0] ? x[0] + '점~' : '~40점'}</span></div>`).join('')}</div>
+        <p class="photo-note">러너 점수는 나이와 성별을 반영해서 같은 조건의 세계 최고 기록을 100점으로 본 점수예요.</p>
+        <button type="button" class="btn btn-accent" style="width:100%; margin-top: 12px;" onclick="closeTierSheet(); openAgeGrade();">${isSelf ? '내 러너 등급 자세히 보기' : '내 러너 등급도 확인하기'}</button>`;
+      document.getElementById('tier-sheet').style.display = 'flex';
+    }
+    function closeTierSheet() { document.getElementById('tier-sheet').style.display = 'none'; }
+
+    // ---------- 프로필 배지 ----------
     async function fillAgeBadge(uid) {
       const el = document.getElementById('ag-badge-' + uid);
       if (!el || !supabaseClient) return;
@@ -5406,8 +5478,40 @@
       const pct = Number(b.pct);
       const t = agTier(pct);
       el2.className = 'ag-badge t' + t[3];
-      el2.innerHTML = `<span class="tier-dot" aria-hidden="true"></span><b>${t[1]}</b><span>${t[2]} · ${CAT_SHORT[b.category]} ${pct.toFixed(1)}점</span>`;
+      el2.setAttribute('aria-label', `러너 등급 ${t[1]} 자세히 보기`);
+      el2.innerHTML = `<span class="tier-dot" aria-hidden="true"></span><b>${t[1]}</b>`;
       el2.hidden = false;
+    }
+
+
+    // ---------- 홈: 러너 소식 한 줄 ----------
+    let homeNewsCache = null;   // { at, rows }
+    async function fillHomeNews() {
+      const el = document.getElementById('home-news');
+      if (!el || !supabaseClient) return;
+      try {
+        if (!homeNewsCache || Date.now() - homeNewsCache.at > 5 * 60 * 1000) {
+          const { data } = await supabaseClient.from('marathon_records').select('id, user_id, name, date').order('date', { ascending: false }).limit(40);
+          homeNewsCache = { at: Date.now(), rows: data || [] };
+          await loadProfilesFor([...new Set(homeNewsCache.rows.map(r => r.user_id))]);
+          await fetchFollowingList();
+        }
+        const el2 = document.getElementById('home-news');
+        if (!el2) return;
+        const others = homeNewsCache.rows.filter(r => r.user_id && (!currentUser || r.user_id !== currentUser.id) && !isBlocked(r.user_id));
+        const fol = others.filter(r => followingIds.has(r.user_id));
+        const pick = fol.length ? fol : others;
+        const users = [...new Set(pick.map(r => r.user_id))];
+        if (!users.length) { el2.innerHTML = ''; return; }
+        const first = profileOf(users[0]).nickname || '러너';
+        const latest = pick[0];
+        el2.innerHTML = `
+          <button class="news-row" onclick="switchMainView('feed')">
+            <span class="news-avs">${users.slice(0, 3).map(u => `<img src="${avatarOf(profileOf(u), u)}" alt="">`).join('')}</span>
+            <span class="news-text"><b>${esc(first)}</b>님${users.length > 1 ? ` 외 ${users.length - 1}명` : ''}이 완주했어요<small>${fol.length ? '팔로우한 러너 소식' : '러너들의 최근 완주'} · ${esc(latest.name)}</small></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+          </button>`;
+      } catch (e) { /* 소식은 없어도 된다 */ }
     }
 
     // ========================================================
@@ -5438,7 +5542,7 @@
       watchLayersForBack();
       initMaskDrawing();
       await syncFromCloud();
-      switchMainView('feed');
+      switchMainView('profile');
     });
 
     function openCertDirectViewer(url, title) {
