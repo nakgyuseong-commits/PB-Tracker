@@ -1036,6 +1036,8 @@
     .news-text { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.4; }
     .news-text small { display: block; color: var(--sub); font-size: 12px; }
     .news-row svg { color: var(--muted); flex-shrink: 0; }
+    .rd-mine { margin: 12px 16px 0; padding: 10px 14px; border-radius: 12px; background: var(--surface); font-size: 13px; color: var(--sub); display: flex; align-items: center; gap: 6px; }
+    .rd-mine b { color: var(--text); }
     .pd-how { margin: 20px 16px 0; border-radius: 14px; background: var(--surface); }
     .pd-how summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
     .pd-how summary::-webkit-details-marker { display: none; }
@@ -1394,7 +1396,8 @@
       <div class="page-head">
         <button class="icon-btn" aria-label="뒤로" onclick="closeRecordDetail()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <h2 id="record-detail-title">완주 기록</h2>
-        <span style="width:44px;"></span>
+        <button type="button" class="btn-text" id="record-detail-edit" hidden>수정</button>
+        <span style="width:44px;" id="record-detail-spacer"></span>
       </div>
       <div class="page-body" id="record-detail-root"></div>
     </div>
@@ -2781,7 +2784,7 @@
       if (tab === 'grid') {
         return `<div class="grid3">${sorted.map(r => {
           const bucket = catBucket(r.category, r.distanceKm);
-          const action = isSelf ? `openEditModal(${jsArg(r.id)})` : `openRecordDetail(${jsArg(r.id)})`;
+          const action = `openRecordDetail(${jsArg(r.id)})`;
           return `
             <button class="tile" ${action ? `onclick="${action}"` : 'disabled'} aria-label="${esc(r.name)} ${shortTime(r)}">
               ${isSafeUrl(r.certImageUrl) ? `<img src="${safeUrl(certThumbUrl(r.certImageUrl, isSelf ? (currentUser && currentUser.id) : r.userId))}" data-full="${safeUrl(r.certImageUrl)}" ${isSelf ? 'data-own="1"' : ''} onerror="certThumbFallback(this)" alt="" loading="lazy" decoding="async">` : `<span class="tile-text">${esc(r.name)}</span>`}
@@ -2793,7 +2796,7 @@
       }
       return sorted.map(r => {
         const bucket = catBucket(r.category, r.distanceKm);
-        const action = isSelf ? `openEditModal(${jsArg(r.id)})` : `openRecordDetail(${jsArg(r.id)})`;
+        const action = `openRecordDetail(${jsArg(r.id)})`;
         return `
           <div class="rec-row">
             <div class="row-main" ${action ? `role="button" tabindex="0" onclick="${action}"` : ''}>
@@ -2957,16 +2960,34 @@
     }
 
     // ---------- 기록 상세: 피드 게시물과 같은 카드 + 좋아요 ----------
+    // 내 기록(화면용 camelCase) → 게시물 화면에 쓰는 DB 행 모양
+    function ownRecordRow(r) {
+      return {
+        id: r.id, user_id: currentUser && currentUser.id, name: r.name, category: r.category, distance_km: r.distanceKm,
+        hours: r.hours, minutes: r.minutes, seconds: r.seconds, date: r.date, bib: r.maskName ? '' : r.bib, notes: r.notes,
+        cert_image_url: r.certImageUrl, is_private: Boolean(r.isPrivate), mask_name: Boolean(r.maskName)
+      };
+    }
     async function openRecordDetail(recId) {
-      const row = (otherRunner && (otherRunner.rows || []).find(r => r.id === recId)) || feedRecords.find(r => r.id === recId);
+      const mine = currentUser && records.find(r => r.id === recId);
+      const row = (otherRunner && (otherRunner.rows || []).find(r => r.id === recId)) || feedRecords.find(r => r.id === recId) || (mine ? ownRecordRow(mine) : null);
       if (!row) return;
+      const isMine = Boolean(currentUser && row.user_id === currentUser.id && mine);
       const modal = document.getElementById('record-detail-modal');
       const root = document.getElementById('record-detail-root');
+      const editBtn = document.getElementById('record-detail-edit');
+      editBtn.hidden = !isMine;
+      document.getElementById('record-detail-spacer').hidden = isMine;
+      editBtn.onclick = () => { closeRecordDetail(); openEditModal(recId); };
       modal.style.display = 'flex';
       root.innerHTML = '<div class="loading">불러오는 중…</div>';
       await Promise.all([loadClapsFor([recId]), loadProfilesFor([row.user_id]), loadPbIds(), loadPhotosFor([recId]), loadAchievedGoals([recId])]);
-      document.getElementById('record-detail-title').textContent = profileOf(row.user_id).nickname || '완주 기록';
-      root.innerHTML = postHtml(row) + '<div style="height:32px;"></div>';
+      document.getElementById('record-detail-title').textContent = isMine ? '내 완주 기록' : (profileOf(row.user_id).nickname || '완주 기록');
+      const note = !isMine ? '' : mine.isPrivate
+        ? `<div class="rd-mine">${ICON_LOCK}<span><b>나만 보기</b> 기록이라 다른 러너에게는 보이지 않아요.</span></div>`
+        : mine.maskName ? `<div class="rd-mine">${ICON_LOCK}<span><b>이름 가림</b> · 다른 러너에게 보이는 그대로예요. 원본은 [수정]에서 볼 수 있어요.</span></div>`
+        : '<div class="rd-mine"><span>다른 러너에게 보이는 그대로예요.</span></div>';
+      root.innerHTML = note + postHtml(row) + '<div style="height:32px;"></div>';
     }
     function closeRecordDetail() {
       document.getElementById('record-detail-modal').style.display = 'none';
