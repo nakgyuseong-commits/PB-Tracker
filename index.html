@@ -948,6 +948,64 @@
     .mask-box.guess { outline: 2.5px dashed #F5B400; outline-offset: 1px; }
     .mask-box.drawing { background: rgba(201,67,27,0.35); outline: 2px solid var(--accent); pointer-events: none; }
     .mask-actions { display: flex; gap: 6px; }
+    /* 나이 환산 기록 */
+    .ag-lead { font-size: 13.5px; line-height: 1.6; margin: 0 0 12px; }
+    .ag-inputs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+    .ag-insight { margin: 14px 16px 0; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); font-size: 13.5px; line-height: 1.55; }
+    .ag-cards { display: flex; flex-direction: column; gap: 8px; margin: 12px 16px 0; }
+    .ag-card { background: var(--surface); border-radius: 16px; padding: 14px 16px; }
+    .ag-card.top { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .ag-card-head { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+    .ag-band { font-weight: 700; }
+    .ag-star { margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--accent); }
+    .ag-legend { background: #FFFFFF; border-radius: 12px; padding: 10px 12px; font-size: 12.5px; color: var(--sub); line-height: 1.7; margin-bottom: 12px; }
+    .ag-legend b { color: var(--text); }
+    .ag-two { display: grid; grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); align-items: center; gap: 6px; margin-top: 10px; }
+    .ag-two > div:not(.ag-arrow) { background: #FFFFFF; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .ag-two > div.on { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .ag-arrow { text-align: center; color: var(--muted); font-weight: 700; }
+    .ag-k { font-size: 11.5px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ag-v { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .ag-s { font-size: 13px; font-weight: 700; color: var(--sub); }
+    .ag-two > div.on .ag-s { color: var(--accent); font-size: 15px; }
+    .ag-gain { font-size: 12.5px; color: var(--sub); margin-top: 8px; line-height: 1.5; }
+    .ag-gain b { color: var(--accent); }
+    .ag-scale { position: relative; margin: 10px 0 18px; }
+    .ag-scale .ag-bar { margin: 0; }
+    .ag-ticks { position: relative; height: 12px; }
+    .ag-ticks span { position: absolute; top: 3px; transform: translateX(-50%); font-size: 10.5px; color: var(--muted); }
+    .ag-pct { font-size: 34px; font-weight: 800; letter-spacing: -0.8px; margin-top: 4px; }
+    .ag-pct small { font-size: 18px; font-weight: 700; margin-left: 2px; }
+    .ag-meta { font-size: 12.5px; color: var(--sub); }
+    .ag-meta b { color: var(--text); }
+    .ag-bar { position: relative; height: 8px; border-radius: 8px; background: var(--line-2); margin: 10px 0 8px; overflow: hidden; }
+    .ag-bar i { display: block; height: 100%; background: var(--accent); border-radius: 8px; }
+    .ag-bar em { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.9); }
+    .ag-next { font-size: 12.5px; color: var(--sub); line-height: 1.6; }
+    .ag-next b { color: var(--text); }
+    .ag-next .link-btn { margin-left: 6px; font-size: 12.5px; }
+    .ag-trend-sum { padding: 0 16px; font-size: 13.5px; line-height: 1.55; }
+    .ag-lines { margin: 8px 16px 0; padding: 0; list-style: none; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+    .ag-lines b { color: var(--accent); }
+    .ag-chart { margin: 8px 16px 0; background: var(--surface); border-radius: 14px; padding: 8px; }
+    .ag-chart svg { width: 100%; height: auto; display: block; }
+    .ag-hist { margin: 8px 16px 0; }
+    .ag-hist > div { display: flex; align-items: center; gap: 6px; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .ag-hist > div > span:first-child { color: var(--sub); width: 54px; flex-shrink: 0; }
+    .ag-hist-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* 등급 배지 (점수가 높을수록 진한 색) */
+    .tier-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; letter-spacing: -0.2px; vertical-align: 1px; }
+    .t1 { --tb: #EEEDEA; --tf: #5F5E5A; } .t2 { --tb: #E3F0E6; --tf: #1D5B36; } .t3 { --tb: #DDEBF7; --tf: #164A73; }
+    .t4 { --tb: #FDF1EC; --tf: #A93716; } .t5 { --tb: #C9431B; --tf: #FFFFFF; } .t6 { --tb: #3F3482; --tf: #FFFFFF; } .t7 { --tb: #17171A; --tf: #F5C451; }
+    .tier-chip { background: var(--tb); color: var(--tf); }
+    .ag-badge { margin: 8px 16px 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 8px; border-radius: 999px; background: var(--tb, var(--accent-soft)); color: var(--tf, #8A2E12); font-size: 12.5px; max-width: calc(100% - 32px); }
+    .ag-badge b { font-size: 13.5px; font-weight: 800; flex-shrink: 0; }
+    .ag-badge span:last-child { opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tier-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--tf); opacity: 0.9; flex-shrink: 0; -webkit-mask: radial-gradient(circle at 50% 50%, #000 38%, transparent 40%), linear-gradient(#000, #000); -webkit-mask-composite: xor; mask-composite: exclude; }
+    .ag-legend-top { margin-bottom: 6px; }
+    .ag-tiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+    .ag-tiers > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .ag-card-head .tier-chip { margin-right: 2px; }
     .pd-how { margin: 20px 16px 0; border-radius: 14px; background: var(--surface); }
     .pd-how summary { list-style: none; cursor: pointer; padding: 14px 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
     .pd-how summary::-webkit-details-marker { display: none; }
@@ -1576,6 +1634,82 @@
     </div>
   </div>
 
+  <!-- 나이 환산 기록 (전체 화면) -->
+  <div id="agegrade-modal" class="page-modal" style="display:none; z-index:94;">
+    <div class="page" role="dialog" aria-modal="true" aria-labelledby="ag-title">
+      <div class="page-head">
+        <button class="icon-btn" aria-label="뒤로" onclick="closeAgeGrade()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h2 id="ag-title">러너 등급</h2>
+        <span style="width:44px;"></span>
+      </div>
+      <div class="page-body">
+        <div class="pd-wrap">
+          <div class="pd-card">
+            <p class="ag-lead">나이가 들면 기록이 느려지는 건 자연스러운 일이에요. 그 차이를 빼고 <b>러너로서의 실력을 100점 만점</b>으로 보여드려요.</p>
+            <div class="ag-legend">
+              <div class="ag-legend-top"><b>100점</b> = 같은 나이·성별 세계 최고 기록</div>
+              <div class="ag-tiers">
+                <div><span class="tier-chip t7">월드클래스</span><span>90점~</span></div>
+                <div><span class="tier-chip t6">엘리트</span><span>80점~</span></div>
+                <div><span class="tier-chip t5">초고수</span><span>70점~</span></div>
+                <div><span class="tier-chip t4">런친자</span><span>60점~</span></div>
+                <div><span class="tier-chip t3">찐러너</span><span>50점~</span></div>
+                <div><span class="tier-chip t2">러너</span><span>40점~</span></div>
+                <div><span class="tier-chip t1">런린이</span><span>~40점</span></div>
+              </div>
+            </div>
+            <div class="ag-inputs">
+              <div class="fg"><label class="fg-label" for="ag-birth">출생 연도</label><select id="ag-birth" class="pd-select" onchange="onAgInfoChange('birth', this.value)"></select></div>
+              <div class="fg"><span class="fg-label">성별</span>
+                <div class="seg" id="ag-gender" style="margin:0;">
+                  <button type="button" class="seg-btn" data-g="M" onclick="onAgInfoChange('gender', 'M')">남성</button>
+                  <button type="button" class="seg-btn" data-g="F" onclick="onAgInfoChange('gender', 'F')">여성</button>
+                </div>
+              </div>
+            </div>
+            <p class="pd-src">출생 연도와 성별은 나만 볼 수 있게 저장돼요. 기록마다 대회 당시 나이로 계산해요.</p>
+          </div>
+
+          <div id="ag-result"></div>
+
+          <h3 class="section-title">공개 설정</h3>
+          <div class="goal-form" style="padding: 0 16px;">
+            <label class="goal-switch">
+              <span><b>등급 랭킹에 참여</b><small>아래 랭킹에 내 점수가 보여요 (나이는 안 보여요)</small></span>
+              <input type="checkbox" id="ag-share" onchange="onAgToggle('share', this.checked)"><i aria-hidden="true"></i>
+            </label>
+            <label class="goal-switch">
+              <span><b>프로필에 등급 배지 달기</b><small>내 기록실에 가장 높은 종목의 등급 배지(예: 런친자 · 풀 61점)가 보여요</small></span>
+              <input type="checkbox" id="ag-badge-toggle" onchange="onAgToggle('badge', this.checked)"><i aria-hidden="true"></i>
+            </label>
+            <p class="photo-note">다른 러너에게는 나이 대신 점수만 보여요. 다만 공개된 기록과 점수를 함께 보면 대략적인 나이를 짐작할 수 있어요.</p>
+          </div>
+
+          <h3 class="section-title">등급 랭킹</h3>
+          <div class="seg" id="ag-rank-cat" role="tablist" aria-label="종목" style="grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 16px 8px;">
+            <button type="button" class="seg-btn" data-cat="Full" onclick="setAgRankCat('Full')">풀</button>
+            <button type="button" class="seg-btn" data-cat="Half" onclick="setAgRankCat('Half')">하프</button>
+            <button type="button" class="seg-btn" data-cat="10K" onclick="setAgRankCat('10K')">10K</button>
+            <button type="button" class="seg-btn" data-cat="5K" onclick="setAgRankCat('5K')">5K</button>
+          </div>
+          <div id="ag-ranking"></div>
+
+          <details class="pd-how">
+            <summary>계산 방식 보기</summary>
+            <div class="pd-how-body">
+              <p>마스터즈 육상에서 쓰는 <b>에이지 그레이딩</b> 방식이에요. 기준표는 Alan Jones의 도로 달리기 연령 기준 2025(미국육상연맹 마스터즈 장거리위원회 2025년 1월 승인)를 써요.</p>
+              <div class="pd-formula">나이 반영 기록 = 내 기록 × 나이·성별 계수<br>점수 = 세계 기준 기록 ÷ 나이 반영 기록 × 100</div>
+              <p>세계 기준 기록은 남자 풀코스 2:00:35, 여자 2:09:56처럼 현재 세계 최고 수준이에요. '기록 그대로' 점수는 나이 보정 없이 이 기준과 바로 비교한 점수예요.</p>
+              <p>점수는 순위가 아니라 세계 최고 기록 대비 수준이에요. 예를 들어 60점은 "세계 최고 기록의 60% 수준"이라는 뜻이고, 동호회에서는 상위권에 해당해요.</p>
+              <p>등급은 월드클래스(90점~), 엘리트(80점~), 초고수(70점~), 런친자(60점~), 찐러너(50점~), 러너(40점~), 런린이(40점 미만)예요.</p>
+              <p class="pd-disclaimer">기준표는 공인 도로 코스 기준이에요. 언덕이 많거나 거리가 다른 코스, 날씨에 따라 점수가 달라질 수 있어요. 출생 연도로 나이를 계산해서 생일 전후로 1살 차이가 날 수 있어요.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 내 프로필 메뉴 -->
   <div id="profile-menu" class="overlay bottom" style="display:none;" onclick="if(event.target===this)closeProfileMenu()">
     <div class="sheet" role="dialog" aria-modal="true" aria-label="메뉴">
@@ -1584,6 +1718,7 @@
       <button class="menu-item" onclick="closeProfileMenu(); openPbModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 15l3-3 2 2 3-4"/></svg>PB 카드 만들기</button>
       <button class="menu-item" onclick="closeProfileMenu(); openRacePredictor();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg>마라톤 기록 예측기</button>
       <button class="menu-item" onclick="closeProfileMenu(); openTrainingGuide();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18l4-6 4 3 4-7 4 5"/><path d="M4 21h16"/></svg>훈련 페이스 가이드</button>
+      <button class="menu-item" onclick="closeProfileMenu(); openAgeGrade();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5.5"/><path d="M9.5 9.2l1.7 1.7 3.3-3.4M8.5 13.8L7 21l5-2.5 5 2.5-1.5-7.2"/></svg>러너 등급</button>
       <div class="menu-divider"></div>
       <div class="menu-group" id="menu-group-settings">설정</div>
       <button class="menu-item" id="menu-install" onclick="closeProfileMenu(); installApp();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>홈 화면에 앱 설치</button>
@@ -2671,6 +2806,7 @@
         </div>
         ${o.showName ? `<div class="pf-name">${nick}</div>` : ''}
         ${p.bio ? `<p class="pf-bio">${esc(p.bio)}</p>` : ''}
+        <div class="ag-badge" id="ag-badge-${esc(o.uid)}" hidden></div>
         ${buttons}
         <h2 class="section-title">${o.isSelf ? '나의 PB' : 'PB'}</h2>
         <div class="pb-tiles">${pbTilesHtml(o.recs)}</div>
@@ -2699,6 +2835,7 @@
         uid: currentUser.id, profile: currentProfile, recs: records, counts: myFollowCounts,
         tab: profileTab, isSelf: true, showName: true, goals: myGoals
       });
+      fillAgeBadge(currentUser.id);
       if (refreshCounts) {
         loadFollowCounts(currentUser.id).then(c => {
           if (c.followers !== myFollowCounts.followers || c.following !== myFollowCounts.following) {
@@ -2755,6 +2892,7 @@
         counts: otherRunner.counts, tab: otherRunner.tab, isSelf, inModal: true, showName: true,
         goals: isSelf ? myGoals : (otherRunner.goals || new Map())
       }) + '<div style="height:32px;"></div>';
+      fillAgeBadge(otherRunner.id);
     }
 
     // ---------- 좋아요 수 추가로 불러오기 (피드에 없는 기록용, 기존 값에 합침) ----------
@@ -3087,6 +3225,7 @@
       loadPhotosFor(records.map(r => r.id)).then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
       loadMyGoals().then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
       loadMyBlocks().then(changed => { if (changed) refreshCurrentView(); });
+      if (currentUser) agBadgeCache.delete(currentUser.id);   // 기록이 바뀌면 내 배지 다시 계산
       const maskedIds = records.filter(r => r.maskName).map(r => r.id);
       if (maskedIds.length) loadPrivateInfo(maskedIds).then(changed => { if (changed && currentMainView === 'profile') renderProfile(false); });
       if (currentMainView === 'profile') renderProfile(false);
@@ -5025,6 +5164,250 @@
         }
       }
       setVisibility(vis);
+    }
+
+    // ========================================================
+    // 나이 환산 기록 (에이지 그레이딩)
+    // 기준표: Alan Jones 도로 달리기 연령 기준 2025 (CC0, USATF 마스터즈 장거리위원회 승인)
+    //   나이 환산 기록 = 기록 × 계수 / 에이지 그레이드(%) = 해당 성별 세계 기준 기록 ÷ 나이 환산 기록
+    // ========================================================
+    const AGE_TABLE = {"M":{"oc":{"5K":769,"10K":1584,"Half":3451,"Full":7235},"from":5,"to":100,"f":{"5K":[0.608,0.6664,0.72,0.7688,0.8128,0.852,0.8864,0.916,0.9408,0.9608,0.976,0.9864,0.9944,0.9995,1,1,1,1,1,1,1,1,1,1,1,0.9999,0.9988,0.9965,0.993,0.9883,0.9824,0.9755,0.9685,0.9615,0.9545,0.9475,0.9405,0.9335,0.9265,0.9195,0.9125,0.9055,0.8985,0.8915,0.8845,0.8775,0.8705,0.8635,0.8565,0.8495,0.8425,0.8355,0.8285,0.8215,0.8145,0.8075,0.8005,0.7935,0.7865,0.7795,0.7725,0.7655,0.7585,0.7514,0.7436,0.7353,0.7264,0.7169,0.7068,0.696,0.6847,0.6728,0.6603,0.6472,0.6334,0.6191,0.6042,0.5887,0.5726,0.5558,0.5385,0.5206,0.5021,0.483,0.4632,0.4429,0.422,0.4005,0.3784,0.3556,0.3323,0.3084,0.2839,0.2588,0.233,0.2067],"10K":[0.5073,0.5678,0.6243,0.6768,0.7253,0.7698,0.8103,0.8468,0.8793,0.9078,0.9323,0.9528,0.9693,0.9818,0.9903,0.9968,1,1,1,1,1,1,1,1,1,1,0.9996,0.9985,0.9967,0.9942,0.9909,0.9869,0.9822,0.9767,0.9705,0.9636,0.9561,0.9486,0.9411,0.9336,0.9261,0.9186,0.9111,0.9036,0.8961,0.8886,0.8811,0.8736,0.8661,0.8586,0.8511,0.8436,0.8361,0.8286,0.8211,0.8136,0.8061,0.7986,0.7911,0.7836,0.7761,0.7686,0.7611,0.7536,0.7461,0.7386,0.7308,0.7223,0.7131,0.7033,0.6928,0.6816,0.6697,0.6572,0.644,0.6301,0.6156,0.6004,0.5845,0.568,0.5508,0.5329,0.5143,0.4951,0.4752,0.4546,0.4334,0.4115,0.3889,0.3657,0.3418,0.3172,0.2919,0.266,0.2394,0.2121],"Half":[0.4621,0.5364,0.605,0.6678,0.7248,0.7762,0.8218,0.8616,0.8957,0.9241,0.9467,0.9636,0.975,0.985,0.995,1,1,1,1,1,1,1,1,1,1,1,1,0.9996,0.9982,0.996,0.9928,0.9888,0.9839,0.9781,0.9714,0.9638,0.956,0.9483,0.9405,0.9327,0.9249,0.9171,0.9094,0.9016,0.8938,0.886,0.8782,0.8705,0.8627,0.8549,0.8471,0.8393,0.8316,0.8238,0.816,0.8082,0.8004,0.7927,0.7849,0.7771,0.7693,0.7615,0.7538,0.746,0.7382,0.7304,0.7223,0.7135,0.704,0.6938,0.683,0.6715,0.6593,0.6464,0.6328,0.6185,0.6036,0.588,0.5717,0.5547,0.537,0.5186,0.4996,0.4799,0.4595,0.4384,0.4167,0.3942,0.3711,0.3473,0.3228,0.2976,0.2718,0.2452,0.218,0.1901],"Full":[0.4414,0.508,0.5702,0.6279,0.6812,0.7301,0.7745,0.8145,0.85,0.8811,0.9078,0.93,0.95,0.968,0.982,0.992,0.998,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0.9999,0.9979,0.9934,0.9865,0.9783,0.9701,0.9619,0.9537,0.9455,0.9373,0.9291,0.9209,0.9127,0.9045,0.8963,0.8881,0.8799,0.8717,0.8635,0.8553,0.8471,0.8389,0.8307,0.8225,0.8143,0.8061,0.7979,0.7897,0.7815,0.7733,0.7651,0.7569,0.7487,0.7405,0.7323,0.7241,0.7155,0.7063,0.6963,0.6857,0.6743,0.6623,0.6495,0.6361,0.6219,0.6071,0.5915,0.5753,0.5583,0.5407,0.5223,0.5033,0.4835,0.4631,0.4419,0.4201,0.3975,0.3743,0.3503,0.3257,0.3003,0.2743,0.2475,0.2201,0.1919]}},"F":{"oc":{"5K":834,"10K":1726,"Half":3772,"Full":7796},"from":5,"to":100,"f":{"5K":[0.6903,0.7222,0.7527,0.7816,0.8091,0.8351,0.8596,0.8827,0.9042,0.9243,0.9433,0.9622,0.9811,0.9953,1,1,1,1,1,1,1,1,0.9997,0.999,0.9977,0.9959,0.9936,0.9908,0.9875,0.9836,0.9793,0.9744,0.9691,0.9632,0.9568,0.9499,0.9425,0.9346,0.9262,0.9172,0.9078,0.898,0.8883,0.8786,0.8689,0.8592,0.8495,0.8398,0.8301,0.8204,0.8107,0.8009,0.7912,0.7815,0.7718,0.7621,0.7524,0.7427,0.733,0.7233,0.7136,0.7038,0.6941,0.6844,0.6747,0.665,0.6553,0.6456,0.6359,0.6262,0.6165,0.6067,0.597,0.5868,0.5758,0.564,0.5515,0.5382,0.5242,0.5094,0.4938,0.4775,0.4604,0.4426,0.424,0.4046,0.3845,0.3636,0.3419,0.3195,0.2964,0.2725,0.2478,0.2223,0.1961,0.1692],"10K":[0.685,0.7183,0.7498,0.7794,0.8072,0.8333,0.8574,0.8798,0.9004,0.9191,0.936,0.952,0.968,0.982,0.992,0.998,1,1,1,1,1,1,1,0.9998,0.9991,0.998,0.9964,0.9944,0.992,0.9891,0.9857,0.9819,0.9777,0.973,0.9679,0.9623,0.9563,0.9499,0.9429,0.9356,0.9278,0.9195,0.9109,0.9017,0.8921,0.8822,0.8723,0.8623,0.8524,0.8425,0.8325,0.8226,0.8126,0.8027,0.7928,0.7828,0.7729,0.7629,0.753,0.7431,0.7331,0.7232,0.7132,0.7033,0.6934,0.6834,0.6735,0.6635,0.6536,0.6437,0.6337,0.6234,0.6123,0.6005,0.5879,0.5745,0.5604,0.5455,0.5299,0.5135,0.4963,0.4784,0.4597,0.4403,0.4201,0.3991,0.3774,0.3549,0.3317,0.3077,0.2829,0.2574,0.2311,0.2041,0.1763,0.1477],"Half":[0.608,0.6474,0.6847,0.72,0.7533,0.7845,0.8137,0.8408,0.8659,0.889,0.91,0.93,0.95,0.968,0.982,0.992,0.998,1,1,1,1,1,1,0.9998,0.9991,0.9979,0.9962,0.9941,0.9915,0.9884,0.9849,0.9809,0.9764,0.9714,0.966,0.9601,0.9537,0.9468,0.9395,0.9317,0.9234,0.9147,0.9055,0.8958,0.8856,0.8753,0.8649,0.8546,0.8442,0.8339,0.8235,0.8132,0.8028,0.7925,0.7821,0.7718,0.7614,0.7511,0.7407,0.7304,0.72,0.7097,0.6993,0.689,0.6786,0.6683,0.6579,0.6476,0.6372,0.6269,0.6165,0.6059,0.5945,0.5822,0.5692,0.5554,0.5407,0.5253,0.5091,0.4921,0.4742,0.4556,0.4362,0.4159,0.3949,0.3731,0.3504,0.327,0.3028,0.2778,0.2519,0.2253,0.1979,0.1696,0.1406,0.1108],"Full":[0.5405,0.5874,0.6311,0.6718,0.7093,0.7438,0.7751,0.8034,0.8285,0.8506,0.8695,0.8869,0.9043,0.9217,0.9391,0.9553,0.9689,0.9801,0.9888,0.995,0.9988,1,1,0.9998,0.9992,0.9983,0.997,0.9953,0.9932,0.9907,0.9879,0.9847,0.9811,0.9771,0.9727,0.968,0.9629,0.9574,0.9515,0.9453,0.9386,0.9316,0.9242,0.9165,0.9083,0.8998,0.8909,0.8816,0.872,0.8619,0.8515,0.8407,0.8297,0.8186,0.8076,0.7965,0.7854,0.7744,0.7633,0.7523,0.7412,0.7301,0.7191,0.708,0.697,0.6859,0.6748,0.6638,0.6527,0.6413,0.629,0.6159,0.6021,0.5874,0.572,0.5557,0.5386,0.5208,0.5021,0.4827,0.4624,0.4413,0.4195,0.3968,0.3734,0.3491,0.324,0.2982,0.2715,0.2441,0.2158,0.1867,0.1569,0.1262,0.0948,0.0625]}}};
+    const AG_CATS = ['Full', 'Half', '10K', '5K'];
+    // 점수대별 등급: [최저 점수, 등급 이름(배지), 설명, 배지 색 단계]
+    const AG_TIERS = [
+      [90, '월드클래스', '세계 정상급', 7],
+      [80, '엘리트', '국가대표급', 6],
+      [70, '초고수', '지역 최상위권', 5],
+      [60, '런친자', '동호회 상위권', 4],
+      [50, '찐러너', '꾸준히 훈련한 러너', 3],
+      [40, '러너', '성장하고 있는 러너', 2],
+      [0, '런린이', '이제 막 시작한 러너', 1]
+    ];
+    const AG_BANDS = AG_TIERS.map(t => [t[0], t[2]]);
+    function agTier(pct) { return AG_TIERS.find(t => pct >= t[0]) || AG_TIERS[AG_TIERS.length - 1]; }
+    function agTierChip(pct) { const t = agTier(pct); return `<span class="tier-chip t${t[3]}">${t[1]}</span>`; }
+    let agePrivate = null;            // { birth_year, gender, share_ranking, show_badge }
+    let ageLoadedFor = null;
+    let ageAvailable = true;
+    let agRankCat = 'Full';
+    const agBadgeCache = new Map();   // user_id → 배지 정보 (null이면 표시 안 함)
+
+    function agBand(pct) { return (AG_BANDS.find(([min]) => pct >= min) || AG_BANDS[AG_BANDS.length - 1])[1]; }
+    function agNextBand(pct) { const up = [...AG_TIERS].reverse().find(([min]) => min > pct); return up ? [up[0], up[1]] : null; }
+    function ageAt(dateStr, birthYear) { const y = parseInt(String(dateStr || '').slice(0, 4)); return y && birthYear ? y - birthYear : null; }
+    function agFactor(gender, cat, age) {
+      const t = AGE_TABLE[gender]; if (!t || !t.f[cat] || age == null) return null;
+      const a = Math.max(t.from, Math.min(t.to, age));
+      return t.f[cat][a - t.from];
+    }
+    function ageGrade(sec, cat, gender, age) {
+      const f = agFactor(gender, cat, age);
+      if (!f || !sec) return null;
+      const graded = sec * f;
+      return { pct: Math.round(AGE_TABLE[gender].oc[cat] / graded * 1000) / 10, graded, factor: f };
+    }
+    // 나이·성별 보정 없이 세계 기준 기록과 그대로 비교한 점수
+    function rawGrade(sec, cat, gender) { return sec ? Math.round(AGE_TABLE[gender].oc[cat] / sec * 1000) / 10 : null; }
+    // 이 나이에 목표 점수를 내려면 필요한 기록
+    function timeForPct(pct, cat, gender, age) {
+      const f = agFactor(gender, cat, age);
+      return f ? AGE_TABLE[gender].oc[cat] / (f * pct / 100) : null;
+    }
+    function agRecords() {
+      if (!agePrivate || !agePrivate.birth_year || !agePrivate.gender) return [];
+      return records.map(r => {
+        const cat = catBucket(r.category, r.distanceKm);
+        const sec = secOf(r);
+        if (!AG_CATS.includes(cat) || sec <= 0) return null;
+        const age = ageAt(r.date, agePrivate.birth_year);
+        const g = ageGrade(sec, cat, agePrivate.gender, age);
+        return g ? { r, cat, sec, age, ...g } : null;
+      }).filter(Boolean);
+    }
+
+    async function loadAgePrivate(force) {
+      if (!currentUser) { agePrivate = null; ageLoadedFor = null; return; }
+      if (!force && ageLoadedFor === currentUser.id) return;
+      try {
+        const { data, error } = await supabaseClient.from('profile_private').select('birth_year, gender, share_ranking, show_badge').eq('user_id', currentUser.id).maybeSingle();
+        if (error) { if (/profile_private|schema cache|42P01|PGRST20/i.test(error.message || '')) ageAvailable = false; return; }
+        ageAvailable = true;
+        agePrivate = data || { birth_year: null, gender: null, share_ranking: false, show_badge: false };
+        ageLoadedFor = currentUser.id;
+      } catch (e) { /* 계산만 못 할 뿐 */ }
+    }
+    async function saveAgePrivate(patch) {
+      agePrivate = { ...(agePrivate || {}), ...patch };
+      if (!ageAvailable) { alert('러너 등급 저장 기능이 아직 준비되지 않았어요. (Supabase에 agegrade_setup.sql 실행 필요)'); return false; }
+      const { error } = await supabaseClient.from('profile_private').upsert({ user_id: currentUser.id, ...agePrivate, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (error) { alert('저장하지 못했어요: ' + error.message); return false; }
+      agBadgeCache.delete(currentUser.id);
+      return true;
+    }
+
+    // ---------- 화면 ----------
+    async function openAgeGrade() {
+      if (!requireLogin('러너 등급을 보려면 먼저 로그인해주세요.')) return;
+      document.getElementById('agegrade-modal').style.display = 'flex';
+      document.querySelector('#agegrade-modal .page-body').scrollTop = 0;
+      document.getElementById('ag-result').innerHTML = '<div class="loading">불러오는 중…</div>';
+      await loadAgePrivate(true);
+      const sel = document.getElementById('ag-birth');
+      if (!sel.options.length) {
+        const now = new Date().getFullYear();
+        sel.innerHTML = '<option value="">선택</option>' + Array.from({ length: now - 14 - 1930 + 1 }, (_, i) => now - 14 - i).map(y => `<option value="${y}">${y}년</option>`).join('');
+      }
+      sel.value = (agePrivate && agePrivate.birth_year) || '';
+      setAgGenderUI((agePrivate && agePrivate.gender) || '');
+      document.getElementById('ag-share').checked = Boolean(agePrivate && agePrivate.share_ranking);
+      document.getElementById('ag-badge-toggle').checked = Boolean(agePrivate && agePrivate.show_badge);
+      renderAgeGrade();
+      loadAgRanking();
+    }
+    function closeAgeGrade() { document.getElementById('agegrade-modal').style.display = 'none'; if (currentMainView === 'profile') renderProfile(false); }
+    function setAgGenderUI(g) {
+      document.querySelectorAll('#ag-gender .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.g === g));
+    }
+    async function onAgInfoChange(kind, value) {
+      if (kind === 'gender') setAgGenderUI(value);
+      const patch = kind === 'gender' ? { gender: value } : { birth_year: value ? parseInt(value) : null };
+      agePrivate = { ...(agePrivate || { share_ranking: false, show_badge: false }), ...patch };
+      renderAgeGrade();
+      if (agePrivate.birth_year && agePrivate.gender) { await saveAgePrivate({}); loadAgRanking(); }
+    }
+    async function onAgToggle(kind, on) {
+      if (!agePrivate || !agePrivate.birth_year || !agePrivate.gender) {
+        alert('출생 연도와 성별을 먼저 골라주세요.');
+        document.getElementById(kind === 'share' ? 'ag-share' : 'ag-badge-toggle').checked = false;
+        return;
+      }
+      const ok = await saveAgePrivate(kind === 'share' ? { share_ranking: on } : { show_badge: on });
+      if (!ok) document.getElementById(kind === 'share' ? 'ag-share' : 'ag-badge-toggle').checked = !on;
+      loadAgRanking();
+    }
+
+    function renderAgeGrade() {
+      const out = document.getElementById('ag-result');
+      if (!agePrivate || !agePrivate.birth_year || !agePrivate.gender) {
+        out.innerHTML = '<div class="empty" style="padding: 28px 24px;"><p>출생 연도와 성별을 고르면<br>기록마다 러너 점수를 계산해요.</p></div>';
+        return;
+      }
+      const all = agRecords();
+      if (!all.length) { out.innerHTML = emptyHtml('계산할 기록이 없어요', '5K, 10K, 하프, 풀코스 기록을 올리면 계산해요.'); return; }
+      const best = {};
+      all.forEach(x => { if (!best[x.cat] || x.pct > best[x.cat].pct) best[x.cat] = x; });
+      const cats = AG_CATS.filter(c => best[c]);
+      const top = cats.reduce((a, c) => (!a || best[c].pct > best[a].pct ? c : a), null);
+      const nowAge = new Date().getFullYear() - agePrivate.birth_year;
+      const cards = cats.map(c => {
+        const b = best[c];
+        const raw = rawGrade(b.sec, c, agePrivate.gender);
+        const next = agNextBand(b.pct);
+        const need = next ? timeForPct(next[0], c, agePrivate.gender, nowAge) : null;
+        const gain = b.pct - raw;
+        return `
+          <div class="ag-card ${c === top ? 'top' : ''}">
+            <div class="ag-card-head"><span class="tag">${CAT_SHORT[c]}</span>${agTierChip(b.pct)}<span class="ag-band">${agBand(b.pct)}</span>${c === top ? '<span class="ag-star">가장 강한 종목</span>' : ''}</div>
+            <div class="ag-two">
+              <div><span class="ag-k">기록 그대로</span><span class="ag-v num">${shortTime(b.r)}</span><span class="ag-s num">${raw.toFixed(1)}점</span></div>
+              <div class="ag-arrow" aria-hidden="true">→</div>
+              <div class="on"><span class="ag-k">나이 반영 (당시 ${b.age}세)</span><span class="ag-v num">${pdFmtTime(b.graded)}</span><span class="ag-s num">${b.pct.toFixed(1)}점</span></div>
+            </div>
+            <div class="ag-gain">${gain >= 0.05 ? `나이를 반영하면 <b>+${gain.toFixed(1)}점</b>이에요. 전성기 나이였다면 ${pdFmtTime(b.graded)}에 해당하는 기록이에요.` : '전성기 나이라 보정 없이 그대로 점수예요.'}</div>
+            <div class="ag-scale" aria-hidden="true">
+              <div class="ag-bar"><i style="width:${Math.min(100, b.pct)}%"></i>${[50, 60, 70, 80, 90].map(m => `<em style="left:${m}%"></em>`).join('')}</div>
+              <div class="ag-ticks"><span style="left:50%">50</span><span style="left:60%">60</span><span style="left:70%">70</span><span style="left:80%">80</span><span style="left:90%">90</span></div>
+            </div>
+            ${next && need ? `<div class="ag-next num">${need < b.sec ? `<b>${fmtGap(b.sec - need)}</b> 줄이면 ` : ''}<b>${next[1]}</b>(${next[0]}점)이에요 <span>· 지금 나이(${nowAge}세)로 ${pdFmtTime(need)}</span>
+              ${(goalsAvailable && ['Full', 'Half', '10K'].includes(c)) ? `<button type="button" class="link-btn" onclick="closeAgeGrade(); openGoalModal(${jsArg(c)}, ${Math.round(need)})">목표로 저장</button>` : ''}</div>` : ''}
+          </div>`;
+      }).join('');
+      let insight = '';
+      if (cats.length >= 2) {
+        const sorted = [...cats].sort((a, b) => best[b].pct - best[a].pct);
+        const gap = best[sorted[0]].pct - best[sorted[sorted.length - 1]].pct;
+        insight = gap >= 1.5
+          ? `<b>${CAT_LABEL[sorted[0]]}</b> 점수가 ${CAT_LABEL[sorted[sorted.length - 1]]}보다 ${gap.toFixed(1)}점 높아요. ${['Full', 'Half'].includes(sorted[0]) ? '거리가 길수록 강한 <b>지구력형</b>이에요.' : '스피드가 강점인 <b>스피드형</b>이에요.'}`
+          : '종목별 점수가 고르게 비슷한 <b>밸런스형</b>이에요.';
+      }
+      // 성장 추이: 기록마다 대회 당시 나이로 계산
+      const hist = [...all].sort((a, b) => String(a.r.date).localeCompare(String(b.r.date)));
+      let trend = '';
+      if (hist.length >= 2) {
+        const W = 320, H = 110, pad = 14;
+        const ps = hist.map(h => h.pct), lo = Math.floor(Math.min(...ps) - 2), hi = Math.ceil(Math.max(...ps) + 2);
+        const x = (i) => pad + (W - pad * 2) * (hist.length === 1 ? 0.5 : i / (hist.length - 1));
+        const y = (p) => H - pad - (H - pad * 2) * (p - lo) / Math.max(1, hi - lo);
+        const pts = hist.map((h, i) => `${x(i).toFixed(1)},${y(h.pct).toFixed(1)}`).join(' ');
+        // 같은 종목끼리만 비교: 첫 기록 → 최고 기록
+        const lines = AG_CATS.map(c => {
+          const list = hist.filter(h => h.cat === c);
+          if (list.length < 2) return '';
+          const first = list[0], bestOne = list.reduce((a, b) => (b.pct > a.pct ? b : a));
+          const d = bestOne.pct - first.pct;
+          return d > 0.05
+            ? `<li><span class="tag">${CAT_SHORT[c]}</span>첫 기록 ${first.pct.toFixed(1)}점 → 최고 ${bestOne.pct.toFixed(1)}점 <b>(+${d.toFixed(1)}점)</b></li>`
+            : `<li><span class="tag">${CAT_SHORT[c]}</span>첫 기록 ${first.pct.toFixed(1)}점이 아직 최고예요. 다음 대회에서 넘어봐요</li>`;
+        }).join('');
+        const peak = hist.reduce((a, b) => (b.pct > a.pct ? b : a));
+        trend = `
+          <h3 class="section-title">나이를 반영한 성장 추이</h3>
+          <p class="ag-trend-sum">가장 높았던 점수는 <b>${esc(String(peak.r.date).slice(0, 7).replace('-', '.'))} ${esc(peak.r.name)}</b> (${CAT_SHORT[peak.cat]}) <b>${peak.pct.toFixed(1)}점</b>이에요. 기록이 조금 늦어져도 나이를 반영하면 실력은 그대로일 수 있어요.</p>
+          ${lines ? `<ul class="ag-lines">${lines}</ul>` : ''}
+          <div class="ag-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="기록별 러너 점수 추이">
+            <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            ${hist.map((h, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(h.pct).toFixed(1)}" r="4" fill="#FFFFFF" stroke="var(--accent)" stroke-width="2"/>`).join('')}
+          </svg></div>
+          <div class="ag-hist">${[...hist].reverse().map(h => `<div><span class="num">${esc(String(h.r.date).slice(0, 7).replace('-', '.'))}</span><span class="tag">${CAT_SHORT[h.cat]}</span><span class="ag-hist-name">${esc(h.r.name)}</span><b class="num">${h.pct.toFixed(1)}점</b></div>`).join('')}</div>`;
+      }
+      out.innerHTML = `${insight ? `<p class="ag-insight">${insight}</p>` : ''}<div class="ag-cards">${cards}</div>${trend}`;
+    }
+
+    async function loadAgRanking() {
+      const box = document.getElementById('ag-ranking');
+      document.querySelectorAll('#ag-rank-cat .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === agRankCat));
+      box.innerHTML = '<div class="loading">불러오는 중…</div>';
+      try {
+        const { data, error } = await supabaseClient.rpc('pbpb_age_grade_ranking', { p_category: agRankCat, p_limit: 100 });
+        if (error) { box.innerHTML = emptyHtml('랭킹을 불러오지 못했어요', /pbpb_age_grade|function|schema cache/i.test(error.message || '') ? '(Supabase에 agegrade_setup.sql 실행 필요)' : '잠시 후 다시 시도해주세요.'); return; }
+        const rows = (data || []).filter(r => !isBlocked(r.user_id));
+        const meIn = currentUser && rows.some(r => r.user_id === currentUser.id);
+        const tip = !(agePrivate && agePrivate.share_ranking) ? '<p class="note">위의 "등급 랭킹에 참여"를 켜면 내 순위도 함께 보여요.</p>' : '';
+        if (!rows.length) { box.innerHTML = emptyHtml(`${CAT_LABEL[agRankCat]} 참여자가 아직 없어요`, '랭킹에 참여한 러너만 보여요.') + tip; return; }
+        box.innerHTML = `<ol class="rank-list">${rows.map(r => {
+          const p = { nickname: r.nickname, avatar_url: r.avatar_url };
+          const isMe = currentUser && r.user_id === currentUser.id;
+          return `<li><button class="row ${isMe ? 'me' : ''}" onclick="openRunnerArchiveModal(${jsArg(r.user_id)})">
+            <span class="rank-no ${r.rank <= 3 ? 'top' : ''}">${r.rank}</span>
+            <img class="avatar av-40" src="${avatarOf(p, r.user_id)}" alt="">
+            <span class="row-main"><span class="row-title" style="display:block;">${esc(r.nickname || '러너')}${isMe ? '<small>나</small>' : ''}</span><span class="row-sub" style="display:block;">${agTierChip(Number(r.pct))}</span></span>
+            <span class="row-right"><span class="row-time num">${Number(r.pct).toFixed(1)}점</span></span>
+          </button></li>`;
+        }).join('')}</ol><p class="note">참여자 ${rows[0].total}명 · 나이와 성별을 반영한 점수 순위예요. 다른 러너에게는 나이 대신 점수만 보여요.</p>${meIn ? '' : tip}`;
+      } catch (e) { box.innerHTML = emptyHtml('랭킹을 불러오지 못했어요', '잠시 후 다시 시도해주세요.'); }
+    }
+    function setAgRankCat(c) { agRankCat = c; loadAgRanking(); }
+
+    // ---------- 프로필 배지: 상위 n% 러너 ----------
+    async function fillAgeBadge(uid) {
+      const el = document.getElementById('ag-badge-' + uid);
+      if (!el || !supabaseClient) return;
+      let b = agBadgeCache.get(uid);
+      if (b === undefined) {
+        try {
+          const { data, error } = await supabaseClient.rpc('pbpb_age_grade_badge', { p_user: uid });
+          b = (!error && data && data[0]) || null;
+        } catch (e) { b = null; }
+        agBadgeCache.set(uid, b);
+      }
+      const el2 = document.getElementById('ag-badge-' + uid);
+      if (!el2) return;
+      if (!b) { el2.hidden = true; return; }
+      const pct = Number(b.pct);
+      const t = agTier(pct);
+      el2.className = 'ag-badge t' + t[3];
+      el2.innerHTML = `<span class="tier-dot" aria-hidden="true"></span><b>${t[1]}</b><span>${t[2]} · ${CAT_SHORT[b.category]} ${pct.toFixed(1)}점</span>`;
+      el2.hidden = false;
     }
 
     // ========================================================
