@@ -874,6 +874,125 @@
     .cele-card h2 { font-size: 22px; font-weight: 800; }
     .cele-card p { font-size: 14.5px; line-height: 1.6; margin: 8px 0 20px; }
     .pd-next { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 8px 16px 0; }
+
+    /* 대회 일정 */
+    .goal-race { font-size: 12.5px; color: var(--accent); font-weight: 600; }
+    .goal-race:empty { display: none; }
+    .mr-link { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; }
+    .mr-soon { font-size: 11px; font-weight: 700; color: #FFFFFF; background: var(--accent); border-radius: 8px; padding: 2px 6px; }
+    .mr-row { margin: 0 16px 8px; background: var(--surface); border-radius: 14px; display: flex; align-items: stretch; }
+    .mr-main { flex: 1; min-width: 0; border: 0; background: none; text-align: left; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; border-radius: 14px; }
+    .mr-main:active { background: var(--surface-2); }
+    .mr-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .mr-dday { flex-shrink: 0; min-width: 56px; height: 30px; padding: 0 8px; border-radius: 9px; background: #FFFFFF; border: 1px solid var(--line-2); font-size: 13.5px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+    .mr-dday.soon { background: var(--accent); border-color: var(--accent); color: #FFFFFF; }
+    .mr-dday.done { background: var(--text); border-color: var(--text); color: #FFFFFF; }
+    .mr-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .mr-text b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mr-text small { font-size: 12.5px; color: var(--sub); }
+    .mr-warn { font-style: normal; color: var(--accent); font-weight: 700; }
+    .mr-goal-link { color: var(--accent); font-weight: 700; }
+    .mr-bar { margin-top: 2px; }
+    .mr-side { border: 0; background: none; color: var(--accent); font-size: 12.5px; font-weight: 700; padding: 0 12px; border-left: 1px solid var(--line); flex-shrink: 0; line-height: 1.3; }
+    .mr-more { display: block; margin: 0 auto; }
+    .rl-filters { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    .rl-filters .chips { padding-top: 6px; }
+    .chip-select { position: relative; display: inline-flex; align-items: center; gap: 4px; }
+    .chip-select::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); margin-left: 4px; }
+    .chip-select select { position: absolute; inset: 0; opacity: 0; width: 100%; font-size: 16px; }
+    .rl-nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 4px; min-height: 54px; }
+    .rl-nav-btn { width: 44px; height: 44px; border: 0; background: none; font-size: 24px; color: var(--sub); border-radius: 12px; }
+    .rl-nav-btn:disabled { opacity: .25; }
+    .rl-nav-mid { display: flex; flex-direction: column; align-items: center; line-height: 1.3; }
+    .rl-nav-mid b { font-size: 17px; }
+    .rl-nav-mid small, .rl-nav-all small { font-size: 12.5px; color: var(--sub); font-weight: 500; }
+    .rl-nav-all { width: 100%; text-align: center; font-size: 15px; font-weight: 700; }
+    .rl-day-head { position: sticky; top: 0; z-index: 1; background: #FFFFFF; font-size: 12.5px; font-weight: 700; color: var(--sub); padding: 12px 16px 4px; }
+    .rl-row { display: flex; align-items: center; gap: 4px; padding: 0 10px 0 4px; border-bottom: 1px solid var(--line); }
+    .rl-row.cancelled { opacity: .5; }
+    .rl-row.cancelled .rl-text b { text-decoration: line-through; }
+    .rl-main { flex: 1; min-width: 0; border: 0; background: none; text-align: left; display: flex; align-items: center; gap: 10px; padding: 12px 6px 12px 8px; }
+    .rl-main:active { background: var(--surface); }
+    .rl-day { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+    .rl-day b { font-size: 19px; font-weight: 800; }
+    .rl-day small { font-size: 11.5px; color: var(--sub); }
+    .rl-day.sun b, .rl-day.sun small { color: var(--accent); }
+    .rl-day.tbd b { font-size: 14px; color: var(--sub); }
+    .rl-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .rl-text b { font-size: 15px; font-weight: 700; line-height: 1.35; }
+    .rl-text small { font-size: 12.5px; color: var(--sub); }
+    .rl-text em { font-style: normal; color: var(--accent); font-weight: 700; }
+    .rl-dists { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 0; align-items: center; }
+    .rl-dists .tag { margin-right: 4px; font-weight: 600; }
+    .ap { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
+    .ap.open { background: var(--accent); color: #FFFFFF; }
+    .ap.soon { background: var(--accent-soft); color: var(--accent); }
+    .ap.closed { background: var(--surface-2); color: var(--muted); }
+    .rl-star { flex-shrink: 0; width: 44px; height: 44px; border: 0; background: none; font-size: 22px; color: #C9C7C2; }
+    .rl-star.on { color: var(--accent); }
+    .rl-done { flex-shrink: 0; height: 32px; padding: 0 10px; border-radius: 9px; border: 0; background: var(--surface-2); color: var(--sub); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+    .rl-foot { padding: 20px 16px 32px; }
+    .rl-foot p { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-top: 12px; text-align: center; }
+    #custom-race-modal .fg, #race-report-modal .fg { margin-top: 12px; }
+    .rs-head { display: flex; align-items: flex-start; gap: 12px; padding: 4px 4px 0; }
+    .rs-head .mr-dday { margin-top: 3px; }
+    .rs-head .sheet-title { padding: 0; line-height: 1.35; }
+    .rs-meta { font-size: 13.5px; color: var(--sub); margin-top: 4px; line-height: 1.5; }
+    .rs-note { margin: 10px 4px 0; font-size: 13px; color: var(--sub); line-height: 1.55; background: var(--surface); border-radius: 10px; padding: 9px 12px; }
+    .rs-note b { color: var(--text); }
+    .rs-note.warn { color: var(--accent); background: var(--accent-soft); }
+    .rs-apply { margin: 12px 4px 0; background: var(--surface); border-radius: 12px; padding: 11px 14px; font-size: 13.5px; line-height: 1.7; }
+    .rs-accent { color: var(--accent); }
+    .rs-muted { color: var(--sub); }
+    .rs-fg { margin: 14px 4px 0; }
+    .rs-dists { flex-wrap: wrap; }
+    .rs-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+    .rs-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .rs-two .btn { height: 50px; font-size: 15px; font-weight: 700; }
+    .rs-actions a.btn { text-decoration: none; }
+    .rs-del { background: #FFFFFF; border: 1px solid #F0D5CB; color: var(--accent); }
+    .rs-links { display: flex; justify-content: center; gap: 12px; margin-top: 6px; }
+    .rs-foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .race-toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translate(-50%, 12px); z-index: 140; background: var(--text); color: #FFFFFF; font-size: 14px; padding: 11px 16px; border-radius: 12px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); text-align: center; }
+    .race-toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .race-fill-note { margin-bottom: 12px; font-size: 13px; color: var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 9px 12px; line-height: 1.5; }
+    .field-input.prefilled { background: #FDF8F5; border-color: #F0D5CB; }
+    .res-card-wrap { background: #FFFFFF; width: 100%; max-width: 420px; border-radius: 22px; padding: 22px 16px 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+    .res-top { text-align: center; padding: 0 4px; }
+    .res-sub { font-size: 13px; color: var(--sub); }
+    .res-time { font-size: 40px; font-weight: 800; margin: 4px 0 2px; letter-spacing: -0.5px; }
+    .res-title { font-size: 21px; font-weight: 800; margin-top: 4px; }
+    .res-title.accent { color: var(--accent); }
+    .res-tier { margin-top: 8px; }
+    .tier-chip.big { font-size: 15px; padding: 6px 14px; }
+    .res-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+    .res-card { width: 100%; border: 0; text-align: left; background: var(--surface); border-radius: 14px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13.5px; }
+    .res-card b { font-size: 15px; display: block; }
+    .res-card small { display: block; font-size: 12.5px; color: var(--sub); margin-top: 2px; }
+    .res-card > span { flex-shrink: 0; text-align: right; }
+    .res-up { color: var(--accent); font-weight: 800; }
+    .res-next { font-size: 12px; color: var(--sub); max-width: 110px; }
+    .res-hint > span { color: var(--muted); font-size: 18px; }
+    .res-extra { text-align: center; font-size: 13px; color: var(--sub); margin-top: 10px; }
+    .res-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+    .res-btns.one { grid-template-columns: 1fr; }
+    .res-btns .btn { height: 48px; }
+    .res-main { margin-top: 8px; }
+    .ra-lead { font-size: 13px; color: var(--sub); line-height: 1.6; padding: 14px 16px 4px; }
+    .ra-bulk { padding: 8px 16px 0; }
+    .ra-card { margin: 10px 16px 0; padding: 14px; border-radius: 14px; background: var(--surface); }
+    .ra-card.ra-done { opacity: .55; }
+    .ra-top { display: flex; align-items: center; gap: 4px; }
+    .ra-origin { font-size: 12px; color: var(--muted); }
+    .ra-race { font-size: 15px; font-weight: 700; margin-top: 8px; }
+    .ra-race small { font-weight: 500; color: var(--sub); font-size: 12.5px; }
+    .ra-fields { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+    .ra-fields div { display: flex; gap: 10px; }
+    .ra-fields span { width: 64px; flex-shrink: 0; color: var(--sub); }
+    .ra-fields b { font-weight: 600; word-break: break-all; }
+    .ra-note { font-size: 13.5px; line-height: 1.55; margin-top: 8px; white-space: pre-wrap; }
+    .ra-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .ra-result { grid-column: 1 / -1; text-align: center; font-size: 13.5px; color: var(--sub); }
     /* 훈련 페이스 가이드 */
     .tr-warn { margin: 16px 16px 0; padding: 14px 16px; border-radius: 14px; background: var(--warn-bg); border: 1px solid var(--warn-line); }
     .tr-warn b { font-size: 14.5px; }
@@ -1113,7 +1232,7 @@
       <button class="tab" id="tab-feed" aria-label="피드" onclick="switchMainView('feed')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><rect x="7.5" y="7" width="9" height="5.5" rx="1"/><path d="M7.5 15.5h9M7.5 18h5.5"/></svg>
       </button>
-      <button class="tab tab-add" aria-label="기록 추가" onclick="openChoiceModal()">
+      <button class="tab tab-add" aria-label="기록 추가" onclick="pendingRaceFill = null; openChoiceModal()">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
       </button>
       <button class="tab" id="tab-ranking" aria-label="랭킹" onclick="switchMainView('ranking')">
@@ -1203,6 +1322,7 @@
           </div>
 
           <div id="ocr-check-note" class="ocr-check-note" style="display:none;"></div>
+          <div id="race-fill-note" class="race-fill-note" style="display:none;">나갈 대회에서 대회명·날짜·종목을 가져왔어요. 완주 기록만 확인해주세요.</div>
 
           <div class="fg">
             <label for="form-name">대회명</label>
@@ -1752,12 +1872,104 @@
     </div>
   </div>
 
+
+  <!-- 대회 일정 -->
+  <div id="race-list-modal" class="page-modal" style="display:none; z-index:93;">
+    <div class="page" role="dialog" aria-modal="true" aria-labelledby="race-list-title">
+      <div class="page-head">
+        <button class="icon-btn" aria-label="뒤로" onclick="closeRaceList()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h2 id="race-list-title">대회 일정</h2>
+        <span style="width:44px;"></span>
+      </div>
+      <div class="rl-filters">
+        <div class="search-wrap" style="padding-top:10px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <label for="race-search" class="sr-only">대회 검색</label>
+          <input id="race-search" class="field-input" type="search" placeholder="대회 이름이나 지역으로 찾기" oninput="onRaceSearch(this.value)" autocomplete="off">
+        </div>
+        <div class="chips" id="race-dists"></div>
+        <div class="chips" id="race-states"></div>
+      </div>
+      <div class="rl-nav" id="race-month-nav"></div>
+      <div class="page-body" id="race-list-root"></div>
+    </div>
+  </div>
+
+  <!-- 대회 정보 -->
+  <div id="race-sheet" class="overlay bottom" style="display:none; z-index:97;" onclick="if(event.target===this)closeRaceSheet()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="대회 정보" style="max-height: 92vh; overflow-y: auto;">
+      <div class="sheet-grip"></div>
+      <div id="race-sheet-body"></div>
+      <button type="button" class="sheet-cancel" onclick="closeRaceSheet()">닫기</button>
+    </div>
+  </div>
+
+  <!-- 목록에 없는 대회 직접 추가 -->
+  <div id="custom-race-modal" class="overlay bottom" style="display:none; z-index:98;" onclick="if(event.target===this)closeCustomRace()">
+    <form class="sheet" role="dialog" aria-modal="true" aria-labelledby="cr-title" style="max-height: 92vh; overflow-y: auto;" onsubmit="submitCustomRace(event)">
+      <div class="sheet-grip"></div>
+      <div class="sheet-title" id="cr-title">대회 직접 추가</div>
+      <div class="sheet-sub">목록에 없는 대회를 나갈 대회에 넣어요.</div>
+      <div class="fg"><label for="cr-name">대회 이름</label><input id="cr-name" class="field-input" maxlength="80" placeholder="2027 ○○마라톤" required></div>
+      <div class="fg"><label for="cr-date">대회 날짜</label><input id="cr-date" class="field-input" type="date" required></div>
+      <div class="fg">
+        <span class="fg-label">나갈 종목</span>
+        <div class="cat-buttons" id="cr-dists">
+          <button type="button" class="cat-btn active" data-d="Full" onclick="setCustomDist('Full')">풀</button>
+          <button type="button" class="cat-btn" data-d="Half" onclick="setCustomDist('Half')">하프</button>
+          <button type="button" class="cat-btn" data-d="10K" onclick="setCustomDist('10K')">10K</button>
+          <button type="button" class="cat-btn" data-d="5K" onclick="setCustomDist('5K')">5K</button>
+        </div>
+      </div>
+      <div class="fg"><label for="cr-region">지역 (선택)</label><input id="cr-region" class="field-input" maxlength="30" placeholder="예: 경기 수원"></div>
+      <div class="fg"><label for="cr-link">대회 홈페이지 (선택)</label><input id="cr-link" class="field-input" type="url" maxlength="300" placeholder="https://"></div>
+      <label class="rp-reason" style="margin-top:12px;"><input type="checkbox" id="cr-share" checked><span>다른 러너도 볼 수 있게 대회 목록에 추가 요청하기</span></label>
+      <button type="submit" class="btn btn-accent btn-block" id="cr-submit" style="margin-top:12px;">나갈 대회에 넣기</button>
+      <button type="button" class="sheet-cancel" onclick="closeCustomRace()">닫기</button>
+    </form>
+  </div>
+
+  <!-- 대회 정보가 달라요 -->
+  <div id="race-report-modal" class="overlay bottom" style="display:none; z-index:99;" onclick="if(event.target===this)closeRaceReport()">
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rr-title">
+      <div class="sheet-grip"></div>
+      <div class="sheet-title" id="rr-title">정보가 달라요</div>
+      <div class="sheet-sub" id="rr-target"></div>
+      <div class="fg"><label for="rr-note">무엇이 다른가요?</label><textarea id="rr-note" class="field-input" rows="3" maxlength="500" placeholder="예: 날짜가 11월 16일로 바뀌었어요 / 접수가 11월 10일 10시에 시작해요 / 대회가 취소됐어요"></textarea></div>
+      <div class="fg"><label for="rr-link">확인한 곳 링크 (선택)</label><input id="rr-link" class="field-input" type="url" maxlength="300" placeholder="https://"></div>
+      <button type="button" class="btn btn-accent btn-block" style="margin-top:12px;" onclick="submitRaceReport()">보내기</button>
+      <button type="button" class="sheet-cancel" onclick="closeRaceReport()">닫기</button>
+    </div>
+  </div>
+
+  <!-- 기록 저장 후 결과 -->
+  <div id="race-result" class="overlay" style="display:none; z-index:130;" onclick="if(event.target===this)closeRaceResult()">
+    <div class="res-card-wrap" role="dialog" aria-modal="true" aria-label="완주 결과">
+      <div style="display:flex; justify-content:flex-end; margin:-10px -6px 0;"><button class="icon-btn" aria-label="닫기" onclick="closeRaceResult()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div id="race-result-body"></div>
+    </div>
+  </div>
+
+  <!-- 관리자: 대회 정보 검토 -->
+  <div id="race-admin-modal" class="page-modal" style="display:none; z-index:94;">
+    <div class="page" role="dialog" aria-modal="true" aria-labelledby="race-admin-title">
+      <div class="page-head">
+        <button class="icon-btn" aria-label="뒤로" onclick="closeRaceAdmin()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <h2 id="race-admin-title">대회 정보 검토</h2>
+        <span style="width:44px;"></span>
+      </div>
+      <div class="page-body" id="race-admin-root" style="padding-bottom:32px;"></div>
+    </div>
+  </div>
+  <div id="race-toast" class="race-toast" role="status" aria-live="polite"></div>
+
   <!-- 내 프로필 메뉴 -->
   <div id="profile-menu" class="overlay bottom" style="display:none;" onclick="if(event.target===this)closeProfileMenu()">
     <div class="sheet" role="dialog" aria-modal="true" aria-label="메뉴">
       <div class="sheet-grip"></div>
       <div class="menu-group" id="menu-group-extra">부가서비스</div>
       <button class="menu-item" onclick="closeProfileMenu(); openPbModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 15l3-3 2 2 3-4"/></svg>PB 카드 만들기</button>
+      <button class="menu-item" onclick="closeProfileMenu(); openRaceList();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>대회 일정</button>
       <button class="menu-item" onclick="closeProfileMenu(); openRacePredictor();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg>마라톤 기록 예측기</button>
       <button class="menu-item" onclick="closeProfileMenu(); openTrainingGuide();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18l4-6 4 3 4-7 4 5"/><path d="M4 21h16"/></svg>훈련 페이스 가이드</button>
       <button class="menu-item" onclick="closeProfileMenu(); openAgeGrade();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="5.5"/><path d="M9.5 9.2l1.7 1.7 3.3-3.4M8.5 13.8L7 21l5-2.5 5 2.5-1.5-7.2"/></svg>러너 등급</button>
@@ -1766,6 +1978,7 @@
       <button class="menu-item" id="menu-install" onclick="closeProfileMenu(); installApp();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M12 7.5v6M9.5 11l2.5 2.5 2.5-2.5"/></svg>홈 화면에 앱 설치</button>
       <button class="menu-item" id="menu-login" onclick="closeProfileMenu(); openAuthModal('login');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M14 16l4-4-4-4M18 12H8"/></svg>로그인 / 가입</button>
       <button class="menu-item" id="menu-profile-edit" onclick="closeProfileMenu(); openProfileModal();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>프로필 수정</button>
+      <button class="menu-item" id="menu-race-admin" style="display:none;" onclick="closeProfileMenu(); openRaceAdmin();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l2 2 4-4"/><path d="M5 4h14v16H5z"/></svg>대회 정보 검토 (관리자)</button>
       <button class="menu-item" onclick="closeProfileMenu(); openPolicyPage('terms');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>이용약관</button>
       <button class="menu-item" onclick="closeProfileMenu(); openPolicyPage('privacy');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>개인정보처리방침</button>
       <button class="menu-item danger" id="menu-logout" onclick="closeProfileMenu(); handleAuthBtnClick();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></svg>로그아웃</button>
@@ -2852,7 +3065,7 @@
         <h2 class="section-title">${o.isSelf ? '나의 PB' : 'PB'}</h2>
         <div class="pb-tiles">${pbTilesHtml(o.recs)}</div>
         ${goalsSectionHtml(o.recs, o.goals || new Map(), o.isSelf)}
-        ${(o.isSelf && !o.inModal) ? '<div id="home-news"></div>' : ''}
+        ${(o.isSelf && !o.inModal) ? '<div id="home-races"></div><div id="home-news"></div>' : ''}
         <div class="pf-tabs" role="tablist">
           <button class="pf-tab ${o.tab === 'grid' ? 'active' : ''}" role="tab" aria-selected="${o.tab === 'grid'}" onclick="setProfileTab('grid', '${scope}')">기록증</button>
           <button class="pf-tab ${o.tab === 'list' ? 'active' : ''}" role="tab" aria-selected="${o.tab === 'list'}" onclick="setProfileTab('list', '${scope}')">목록</button>
@@ -2884,6 +3097,7 @@
         tab: profileTab, isSelf: true, showName: true, goals: myGoals
       });
       fillAgeBadge(currentUser.id);
+      fillHomeRaces();
       fillHomeNews();
       if (refreshCounts) {
         loadFollowCounts(currentUser.id).then(c => {
@@ -3345,9 +3559,11 @@
       if (!requireLogin()) return;
       document.getElementById("choice-modal").style.display = "flex";
     }
-    function closeChoiceModal() { document.getElementById("choice-modal").style.display = "none"; }
+    function closeChoiceModal() { pendingRaceFill = null; document.getElementById("choice-modal").style.display = "none"; }
     function handleChoiceSelect(type) {
+      const keep = type === 'batch' ? null : pendingRaceFill;
       closeChoiceModal();
+      pendingRaceFill = keep;
       if (type === 'ocr') triggerOcrUpload();
       else if (type === 'batch') triggerBatchUpload();
       else openCreateModal();
@@ -3377,6 +3593,7 @@
       document.getElementById("input-modal").style.display = "flex";
       document.querySelector('#input-modal .page-body').scrollTop = 0;
       updateAutoPace();
+      applyPendingRaceFill();
     }
 
     async function openEditModal(id) {
@@ -3384,6 +3601,7 @@
       if (!rec) return;
       currentEditingId = id;
       tempCertDataUrl = null;
+      clearPendingRaceFill();
       setFormMode(true);
       clearOcrMarks();
       document.getElementById("form-name").value = rec.name;
@@ -3413,6 +3631,7 @@
     }
 
     function closeInputModal() {
+      clearPendingRaceFill();
       document.getElementById("input-modal").style.display = "none";
       document.getElementById("ocr-overlay").style.display = "none";
     }
@@ -3454,6 +3673,8 @@
       const submitBtns = document.querySelectorAll('button[form="record-form"]');
       submitBtns.forEach(b => { b.disabled = true; });
       const recId = currentEditingId || ("rec_" + Date.now());
+      const isNewRecord = !currentEditingId;
+      const recordsBefore = records.slice();
       let finalCertUrl = null;
       let uploadFailed = false;
       try {
@@ -3544,7 +3765,9 @@
         if (uploadFailed) alert("기록은 저장했지만 기록증 사진 업로드에 실패했어요. [수정]에서 사진을 다시 올려주세요.");
         if (photoResult.unavailable) alert("기록은 저장했지만 대회 사진 기능이 아직 준비되지 않았어요. (Supabase에 photos_setup.sql 실행 필요)");
         else if (photoResult.failed) alert(`기록은 저장했지만 대회 사진 ${photoResult.failed}장을 올리지 못했어요. [수정]에서 다시 올려주세요.`);
-        await checkGoalAchieved(recData);
+        // 새 기록이면 결과 화면 (PB·목표·러너 등급), 고친 기록이면 목표 달성만 확인
+        if (isNewRecord) await showRaceResult(recData, recordsBefore).catch(err => { console.warn('result:', err); return checkGoalAchieved(recData); });
+        else await checkGoalAchieved(recData);
         if (currentMainView === 'feed') loadFeed();
       } finally {
         submitBtns.forEach(b => { b.disabled = false; });
@@ -3589,6 +3812,7 @@
         tempCertDataUrl = compressedDataUrl;
         updateCertPreviewUI(tempCertDataUrl);
         await runOcrIntoForm(tempCertDataUrl);
+        applyPendingRaceFill();
       } catch (err) {
         console.error("OCR file error:", err);
       }
@@ -3603,6 +3827,7 @@
         tempCertDataUrl = compressedDataUrl;
         updateCertPreviewUI(tempCertDataUrl);
         await runOcrIntoForm(tempCertDataUrl);
+        applyPendingRaceFill();
       } catch (err) {
         console.error("Modal cert error:", err);
       }
@@ -4156,6 +4381,7 @@
             <button class="goal-main" ${isSelf ? `onclick="openGoalModal(${jsArg(g.category)})" aria-label="${CAT_SHORT[g.category]} 목표 수정"` : 'tabindex="-1"'}>
               <span class="goal-top"><span class="tag">${CAT_SHORT[g.category]}</span><b class="num">목표 ${pdFmtTime(g.target)}</b>${isSelf ? `<span class="goal-vis">${g.isPublic ? '공개' : '나만 보기'}</span>` : ''}</span>
               ${meta ? `<span class="goal-meta">${meta}</span>` : ''}
+              ${isSelf ? `<span class="goal-race" data-goal-race="${g.category}"></span>` : ''}
               <span class="goal-bar" aria-hidden="true"><i style="width:${pr.pct}%"></i></span>
               <span class="goal-status num">${status}</span>
             </button>
@@ -4255,7 +4481,7 @@
     }
 
     // ---------- 목표 달성 확인 (기록 저장 직후) ----------
-    async function checkGoalAchieved(rec) {
+    async function checkGoalAchieved(rec, silent) {
       if (!currentUser || !supabaseClient || !goalsAvailable) return;
       await loadMyGoals();
       const cat = catBucket(rec.category, rec.distanceKm);
@@ -4268,8 +4494,9 @@
       if (error) { console.warn('goal achieve:', error.message); return; }
       myGoals.delete(cat);
       if (g.isPublic) achievedGoalByRecord.set(rec.id, { ...g, achievedRecordId: rec.id });
-      showGoalCelebrate(g, rec);
+      if (!silent) showGoalCelebrate(g, rec);
       if (currentMainView === 'profile') renderProfile(false);
+      return g;
     }
     function showGoalCelebrate(g, rec) {
       const sec = secOf(rec);
@@ -5564,7 +5791,697 @@
       initMaskDrawing();
       await syncFromCloud();
       switchMainView('profile');
+      checkRaceAdmin();
     });
+
+    // ========================================================
+    // 대회 일정: ☆ 관심 대회 · 신청 완료(나갈 대회) · 대회 후 결과 화면
+    // ========================================================
+    let raceList = null;              // races 표 (다가오는 대회)
+    let raceListAt = 0;
+    let racesAvailable = true;        // races_setup.sql 실행 여부
+    let myRaces = [];                 // [{ id, race_id, status, name, race_date, distance, race }]
+    let myRacesFor = null;
+    let isRaceAdmin = false;
+    let adminCheckedFor = null;
+    let raceDist = 'all';             // all | Full | Half | 10K | 5K
+    let raceRegion = '';              // '' = 전체 지역
+    let raceState = '';               // '' | open | star | mine
+    let raceQuery = '';
+    let raceMonth = null;             // 'YYYY-MM'
+    let raceSheetCtx = null;          // { race, mine, dist }
+    let pendingRaceFill = null;       // 기록증 올리기: { name, date, dist }
+    const RACE_DISTS = [['all', '전체'], ['Full', '풀'], ['Half', '하프'], ['10K', '10K'], ['5K', '5K']];
+    const RACE_REGIONS = ['서울', '경기·인천', '강원', '충청', '전라', '경상', '제주', '해외'];
+    const RACE_MAIN_DISTS = ['Full', 'Half', '10K', '5K'];
+    const RACE_KM = { Full: 42.195, Half: 21.0975, '10K': 10, '5K': 5 };
+    const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+    try { raceRegion = localStorage.getItem('pbpb_race_region') || ''; } catch (e) {}
+
+    function todayYmd() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function ymdDate(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+    function daysUntil(s) { return Math.round((ymdDate(s) - ymdDate(todayYmd())) / 86400000); }
+    function distLabel(d) { return CAT_SHORT[d] || d; }
+    function raceDateOf(x) { return (x.race && x.race.race_date) || x.race_date || null; }
+    function raceMonthOf(x) { return (x.race && x.race.race_month) || x.race_month || (raceDateOf(x) || '').slice(0, 7) || null; }
+    function raceNameOf(x) { return (x.race && x.race.name) || x.name; }
+    function mdw(s) { const dt = ymdDate(s); return `${dt.getMonth() + 1}.${dt.getDate()} (${WEEK[dt.getDay()]})`; }
+    function fmtRaceDate(x, withWeek) {
+      const d = raceDateOf(x);
+      if (d) { const dt = ymdDate(d); return `${dt.getFullYear()}.${dt.getMonth() + 1}.${dt.getDate()}${withWeek ? ` (${WEEK[dt.getDay()]})` : ''}`; }
+      const m = raceMonthOf(x);
+      return m ? `${m.slice(0, 4)}년 ${Number(m.slice(5, 7))}월 예정` : '날짜 미정';
+    }
+    function ddayText(x) {
+      const d = raceDateOf(x);
+      if (!d) return '예정';
+      const n = daysUntil(d);
+      return n === 0 ? 'D-DAY' : n > 0 ? `D-${n}` : `D+${-n}`;
+    }
+    function raceSortKey(x) { return (raceDateOf(x) || `${raceMonthOf(x) || '9999-12'}-99`) + raceNameOf(x); }
+    function monthLabel(m) { return `${m.slice(0, 4)}년 ${Number(m.slice(5, 7))}월`; }
+    function shiftMonth(m, k) { const [y, mo] = m.split('-').map(Number); const d = new Date(y, mo - 1 + k, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+    function regionGroup(r) {
+      if (r.country && r.country !== 'KR') return '해외';
+      const s = String(r.region || '');
+      if (/^서울/.test(s)) return '서울';
+      if (/^(경기|인천)/.test(s)) return '경기·인천';
+      if (/^강원/.test(s)) return '강원';
+      if (/^(충북|충남|대전|세종)/.test(s)) return '충청';
+      if (/^(전북|전남|광주)/.test(s)) return '전라';
+      if (/^(경북|경남|대구|부산|울산)/.test(s)) return '경상';
+      if (/^제주/.test(s)) return '제주';
+      return '';
+    }
+    function safeUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? u : null; }
+
+    // 접수 상태: { kind: 'soon'|'open'|'closed', text, days }  · 모르면 null
+    function applyInfo(r) {
+      if (!r) return null;
+      const t = todayYmd();
+      if (r.apply_end && t > r.apply_end) return { kind: 'closed', text: '접수 마감' };
+      if (r.apply_start && t < r.apply_start) {
+        return { kind: 'soon', days: daysUntil(r.apply_start), text: `${mdw(r.apply_start)}${r.apply_start_time ? ' ' + r.apply_start_time : ''} 접수` };
+      }
+      if ((r.apply_start && t >= r.apply_start) || r.apply_state === 'open') {
+        if (r.apply_end) { const n = daysUntil(r.apply_end); return { kind: 'open', days: n, text: `접수 중 · 마감 ${n === 0 ? '오늘' : 'D-' + n}` }; }
+        return { kind: 'open', text: '접수 중' };
+      }
+      if (r.apply_state === 'closed') return { kind: 'closed', text: '접수 마감' };
+      return null;
+    }
+    // 관심 대회 중 접수가 7일 안에 시작하거나 마감되는 것
+    function applySoonCount() {
+      return myRaces.filter(m => m.status === 'interested' && m.race).filter(m => {
+        const a = applyInfo(m.race);
+        return a && ((a.kind === 'soon' && a.days <= 7) || (a.kind === 'open' && a.days != null && a.days <= 7));
+      }).length;
+    }
+
+    async function loadRaces(force) {
+      if (!supabaseClient) return [];
+      if (!force && raceList && Date.now() - raceListAt < 10 * 60 * 1000) return raceList;
+      const today = todayYmd();
+      const { data, error } = await supabaseClient.from('races').select('*')
+        .or(`race_date.gte.${today},and(race_date.is.null,race_month.gte.${today.slice(0, 7)})`).limit(3000);
+      if (error) { if (isMissingRelation(error, 'races')) racesAvailable = false; return raceList || []; }
+      racesAvailable = true;
+      raceList = (data || []).sort((a, b) => raceSortKey(a).localeCompare(raceSortKey(b)));
+      raceListAt = Date.now();
+      return raceList;
+    }
+    async function loadMyRaces(force) {
+      if (!currentUser || !supabaseClient) { myRaces = []; myRacesFor = null; return myRaces; }
+      if (!force && myRacesFor === currentUser.id) return myRaces;
+      const { data, error } = await supabaseClient.from('my_races').select('*, race:races(*)').eq('user_id', currentUser.id);
+      if (error) { if (isMissingRelation(error, 'my_races')) racesAvailable = false; return myRaces; }
+      myRaces = (data || []).sort((a, b) => raceSortKey(a).localeCompare(raceSortKey(b)));
+      myRacesFor = currentUser.id;
+      return myRaces;
+    }
+    async function checkRaceAdmin() {
+      adminCheckedFor = currentUser ? currentUser.id : null;
+      if (!currentUser || !supabaseClient) isRaceAdmin = false;
+      else { const { data, error } = await supabaseClient.rpc('pbpb_is_admin'); isRaceAdmin = !error && data === true; }
+      const el = document.getElementById('menu-race-admin');
+      if (el) el.style.display = isRaceAdmin ? '' : 'none';
+    }
+    function myEntryFor(raceId) { return myRaces.find(m => m.race_id === raceId); }
+    function sortMyRaces() { myRaces.sort((a, b) => raceSortKey(a).localeCompare(raceSortKey(b))); }
+
+    // 대회가 끝났는데 아직 그날 기록이 없으면 "기록증 올리기" (끝나고 30일까지)
+    function isPastRace(m) { const d = raceDateOf(m); return Boolean(d) && daysUntil(d) < 0; }
+    function needsCert(m) {
+      const d = raceDateOf(m);
+      if (!d) return false;
+      const n = daysUntil(d);
+      return n < 0 && n >= -30 && !records.some(r => r.date === d);
+    }
+    function homeRaces() {
+      return myRaces.filter(m => m.status === 'registered' && m.race_id !== undefined)
+        .filter(m => m.race ? m.race.status !== 'cancelled' || !isPastRace(m) : true)
+        .filter(m => !isPastRace(m) || needsCert(m));
+    }
+    // 같은 종목에서 가장 가까운 나갈 대회에 내 목표를 붙인다
+    function goalAttachments() {
+      const out = new Map();   // my_race id → goal
+      if (typeof goalsAvailable === 'undefined' || !goalsAvailable || !myGoals) return out;
+      for (const cat of GOAL_CATS) {
+        const g = myGoals.get(cat);
+        if (!g) continue;
+        const m = homeRaces().find(x => x.distance === cat && (!raceDateOf(x) || daysUntil(raceDateOf(x)) >= 0));
+        if (m) out.set(m.id, g);
+      }
+      return out;
+    }
+
+    // ---------- 홈: 나갈 대회 ----------
+    async function fillHomeRaces() {
+      if (!document.getElementById('home-races') || !currentUser) return;
+      if (adminCheckedFor !== currentUser.id) checkRaceAdmin();
+      await loadMyRaces();
+      const box = document.getElementById('home-races');
+      if (!box) return;
+      if (!racesAvailable) { box.innerHTML = ''; return; }
+      const list = homeRaces();
+      const goals = goalAttachments();
+      const soon = applySoonCount();
+      const rows = list.slice(0, 4).map(m => homeRaceRowHtml(m, goals.get(m.id))).join('');
+      box.innerHTML = `
+        <div class="goal-head">
+          <h2 class="section-title">나갈 대회</h2>
+          <button class="btn-text mr-link" onclick="openRaceList()">대회 일정${soon ? `<span class="mr-soon">접수 임박 ${soon}</span>` : ''} ›</button>
+        </div>
+        ${rows || `<button class="goal-empty" onclick="openRaceList()"><b>신청한 대회를 추가해보세요</b><span>전국 대회 일정에서 골라 넣으면 D-day를 알려드려요</span></button>`}
+        ${list.length > 4 ? `<button type="button" class="link-btn muted mr-more" onclick="openRaceList('mine')">나갈 대회 ${list.length}개 모두 보기</button>` : ''}`;
+      // "나의 목표"에 어느 대회에서 도전하는지 덧붙이기
+      document.querySelectorAll('[data-goal-race]').forEach(el => {
+        const cat = el.dataset.goalRace;
+        const m = list.find(x => goals.get(x.id) && x.distance === cat);
+        el.textContent = m ? `→ ${raceNameOf(m)}에서 도전` : '';
+      });
+    }
+    function homeRaceRowHtml(m, g) {
+      const after = isPastRace(m);
+      const n = raceDateOf(m) ? daysUntil(raceDateOf(m)) : null;
+      const cls = after ? 'done' : (n !== null && n <= 14 ? 'soon' : '');
+      const cancelled = m.race && m.race.status === 'cancelled';
+      const dday = `<span class="mr-dday ${cls} num">${after ? '완주' : ddayText(m)}</span>`;
+      const side = after ? `<button class="mr-side" onclick="startCertForRace(${jsArg(m.id)})">기록증<br>올리기</button>`
+        : g ? `<button class="mr-side" onclick="openTrainingGuide(${jsArg(m.distance)}, ${g.target})">훈련<br>페이스</button>` : '';
+      let sub = `<span class="tag">${esc(distLabel(m.distance))}</span>${esc(fmtRaceDate(m, true))}`;
+      if (cancelled) sub += ' · <em class="mr-warn">취소됐어요</em>';
+      let extra = '';
+      if (g && !after) {
+        const pr = goalProgress(records, g);
+        sub = `<span class="tag">${esc(distLabel(m.distance))}</span>목표 ${pdFmtTime(g.target)}`;
+        extra = `<span class="goal-bar mr-bar" aria-hidden="true"><i style="width:${pr.pct}%"></i></span>
+          <span class="goal-status num">${pr.pb ? `PB ${pdFmtTime(pr.pb)} · <b>${pr.left > 0 ? fmtGap(pr.left) + ' 남음' : '이미 달성'}</b>` : '아직 이 종목 기록이 없어요'}</span>`;
+      } else if (g && after) {
+        sub = `<span class="tag">${esc(distLabel(m.distance))}</span>목표 ${pdFmtTime(g.target)}`;
+        extra = '<span class="goal-status">기록증을 올리면 목표 달성 여부를 알려드려요</span>';
+      } else if (!after && GOAL_CATS.includes(m.distance) && typeof goalsAvailable !== 'undefined' && goalsAvailable && !myGoals.get(m.distance)) {
+        sub += ` · <span class="mr-goal-link" role="button" tabindex="0" onclick="event.stopPropagation(); openGoalModal(${jsArg(m.distance)})">목표 정하기 ›</span>`;
+      }
+      return `
+        <div class="mr-row ${extra ? 'wide' : ''}">
+          <button class="mr-main" onclick="openMyRaceSheet(${jsArg(m.id)})">
+            <span class="mr-top">${dday}<span class="mr-text"><b>${esc(raceNameOf(m))}</b><small>${sub}</small></span></span>
+            ${extra}
+          </button>
+          ${side}
+        </div>`;
+    }
+
+    // ---------- 대회 일정 화면 ----------
+    async function openRaceList(mode) {
+      document.getElementById('race-list-modal').style.display = 'flex';
+      document.getElementById('race-search').value = raceQuery;
+      if (mode === 'mine') raceState = 'mine';
+      if (!raceMonth) raceMonth = todayYmd().slice(0, 7);
+      renderRaceFilters();
+      const root = document.getElementById('race-list-root');
+      if (!raceList) root.innerHTML = '<div class="loading">대회 목록을 불러오는 중…</div>';
+      await Promise.all([loadRaces(), loadMyRaces()]);
+      renderRaceList();
+    }
+    function closeRaceList() { document.getElementById('race-list-modal').style.display = 'none'; }
+    function renderRaceFilters() {
+      document.getElementById('race-dists').innerHTML = RACE_DISTS.map(([k, l]) =>
+        `<button class="chip ${raceDist === k ? 'active' : ''}" onclick="setRaceDist('${k}')">${l}</button>`).join('');
+      const states = [['open', '접수 중'], ['star', '관심 대회'], ...(currentUser ? [['mine', '나갈 대회']] : [])];
+      document.getElementById('race-states').innerHTML = `
+        <label class="chip chip-select ${raceRegion ? 'active' : ''}"><span>${raceRegion || '전체 지역'}</span>
+          <select aria-label="지역" onchange="setRaceRegion(this.value)">
+            <option value="">전체 지역</option>${RACE_REGIONS.map(r => `<option ${r === raceRegion ? 'selected' : ''}>${r}</option>`).join('')}
+          </select></label>` +
+        states.map(([k, l]) => `<button class="chip ${raceState === k ? 'active' : ''}" onclick="setRaceState('${k}')">${l}</button>`).join('');
+    }
+    function setRaceDist(k) { raceDist = k; renderRaceFilters(); renderRaceList(); }
+    function setRaceState(k) { raceState = raceState === k ? '' : k; renderRaceFilters(); renderRaceList(); }
+    function setRaceRegion(v) {
+      raceRegion = v;
+      try { localStorage.setItem('pbpb_race_region', v); } catch (e) {}
+      renderRaceFilters(); renderRaceList();
+    }
+    function onRaceSearch(v) { raceQuery = v.trim(); renderRaceList(); }
+    function moveRaceMonth(k) {
+      const min = todayYmd().slice(0, 7);
+      const next = shiftMonth(raceMonth, k);
+      if (next < min) return;
+      raceMonth = next;
+      renderRaceList();
+      document.getElementById('race-list-root').scrollTop = 0;
+    }
+
+    function raceMatches(r, ignoreMonth) {
+      if (raceDist !== 'all' && !(r.distances || []).includes(raceDist)) return false;
+      if (raceRegion && regionGroup(r) !== raceRegion) return false;
+      const mine = myEntryFor(r.id);
+      if (raceState === 'open' && (r.status === 'cancelled' || (applyInfo(r) || {}).kind !== 'open')) return false;
+      if (raceState === 'star' && !(mine && mine.status === 'interested')) return false;
+      if (raceState === 'mine' && !(mine && mine.status === 'registered')) return false;
+      const q = raceQuery.replace(/\s+/g, '').toLowerCase();
+      if (q && !`${r.name}${r.region || ''}${r.place || ''}`.replace(/\s+/g, '').toLowerCase().includes(q)) return false;
+      if (!ignoreMonth && raceMonthOf(r) !== raceMonth) return false;
+      return true;
+    }
+    function renderRaceList() {
+      const root = document.getElementById('race-list-root');
+      const nav = document.getElementById('race-month-nav');
+      if (!racesAvailable) { nav.innerHTML = ''; root.innerHTML = emptyHtml('대회 일정이 아직 준비되지 않았어요', 'Supabase에 races_setup.sql을 실행하면 보여요.'); return; }
+      // 검색하거나 관심·나갈 대회만 볼 때는 모든 달을 한 번에
+      const allMonths = Boolean(raceQuery) || raceState === 'star' || raceState === 'mine';
+      const list = (raceList || []).filter(r => raceMatches(r, allMonths));
+      const customs = myRaces.filter(m => !m.race_id && (!raceDateOf(m) || daysUntil(raceDateOf(m)) >= 0))
+        .filter(m => raceState !== 'star' && raceState !== 'open' && (raceDist === 'all' || m.distance === raceDist) && !raceRegion)
+        .filter(m => !raceQuery || m.name.replace(/\s+/g, '').includes(raceQuery.replace(/\s+/g, '')))
+        .filter(m => allMonths || raceMonthOf(m) === raceMonth);
+      const items = [...list.map(r => ({ r })), ...customs.map(m => ({ m }))].sort((a, b) => raceSortKey(a.r || a.m).localeCompare(raceSortKey(b.r || b.m)));
+      const min = todayYmd().slice(0, 7);
+      nav.innerHTML = allMonths
+        ? `<div class="rl-nav-all">${raceQuery ? `"${esc(raceQuery)}" 검색 결과` : raceState === 'star' ? '관심 대회' : '나갈 대회'} <small>${items.length}개</small></div>`
+        : `<button class="rl-nav-btn" aria-label="이전 달" onclick="moveRaceMonth(-1)" ${raceMonth <= min ? 'disabled' : ''}>‹</button>
+           <div class="rl-nav-mid"><b>${monthLabel(raceMonth)}</b><small>${items.length}개 대회</small></div>
+           <button class="rl-nav-btn" aria-label="다음 달" onclick="moveRaceMonth(1)">›</button>`;
+      let html = '', head = '';
+      items.forEach(it => {
+        const x = it.r || it.m;
+        const d = raceDateOf(x);
+        const h = allMonths ? (d ? `${monthLabel(d.slice(0, 7))} ${ymdDate(d).getDate()}일 (${WEEK[ymdDate(d).getDay()]})` : `${monthLabel(raceMonthOf(x))} · 날짜 미정`)
+          : (d ? `${ymdDate(d).getDate()}일 (${WEEK[ymdDate(d).getDay()]})` : '날짜 미정');
+        if (h !== head) { head = h; html += `<div class="rl-day-head">${h}</div>`; }
+        html += it.r ? raceRowHtml(it.r) : customRowHtml(it.m);
+      });
+      if (!items.length) {
+        html = raceState === 'star' ? emptyHtml('관심 대회가 없어요', '나가고 싶은 대회에 ☆를 눌러두면 접수 일정을 챙겨볼 수 있어요.')
+          : raceState === 'mine' ? emptyHtml('나갈 대회가 없어요', '신청한 대회를 골라 [신청했어요]를 눌러주세요.')
+          : emptyHtml('조건에 맞는 대회가 없어요', allMonths ? '다른 이름으로 찾아보거나 아래에서 직접 추가할 수 있어요.' : '다른 달로 넘겨보거나 필터를 바꿔보세요.');
+      }
+      root.innerHTML = html + `
+        <div class="rl-foot">
+          <button class="btn btn-soft btn-block" onclick="openCustomRace()">찾는 대회가 없나요? 직접 추가하기</button>
+          <p>대회 정보는 공개된 일정을 모은 것이라 바뀔 수 있어요. 신청 전에 꼭 대회 공식 안내를 확인해주세요.</p>
+        </div>`;
+    }
+    function raceDayCell(x) {
+      const d = raceDateOf(x);
+      if (!d) return `<span class="rl-day tbd"><b>${Number((raceMonthOf(x) || '0000-00').slice(5, 7))}월</b><small>예정</small></span>`;
+      const dt = ymdDate(d);
+      return `<span class="rl-day ${dt.getDay() === 0 ? 'sun' : ''}"><b class="num">${dt.getDate()}</b><small>${WEEK[dt.getDay()]}</small></span>`;
+    }
+    function raceRowHtml(r) {
+      const mine = myEntryFor(r.id);
+      const cancelled = r.status === 'cancelled';
+      const a = cancelled ? null : applyInfo(r);
+      const dists = (r.distances || []).map(d => `<span class="tag">${esc(distLabel(d))}</span>`).join('');
+      let right = '';
+      if (cancelled) right = '';
+      else if (mine && mine.status === 'registered') right = `<button class="rl-done" onclick="openRaceSheet(${r.id})">신청 완료</button>`;
+      else {
+        const on = mine && mine.status === 'interested';
+        right = `<button class="rl-star ${on ? 'on' : ''}" aria-pressed="${on}" aria-label="${on ? '관심 대회 해제' : '관심 대회로 저장'}" onclick="toggleInterest(${r.id})">${on ? '★' : '☆'}</button>`;
+      }
+      return `
+        <div class="rl-row ${cancelled ? 'cancelled' : ''}">
+          <button class="rl-main" onclick="openRaceSheet(${r.id})">
+            ${raceDayCell(r)}
+            <span class="rl-text"><b>${esc(r.name)}</b><small>${esc(r.region || '')}${cancelled ? ' · <em>취소됐어요</em>' : r.status === 'postponed' ? ' · <em>연기</em>' : ''}</small>
+              <span class="rl-dists">${dists}${a ? `<span class="ap ${a.kind}">${esc(a.text)}</span>` : ''}</span></span>
+          </button>
+          ${right}
+        </div>`;
+    }
+    function customRowHtml(m) {
+      return `
+        <div class="rl-row">
+          <button class="rl-main" onclick="openMyRaceSheet(${jsArg(m.id)})">
+            ${raceDayCell(m)}
+            <span class="rl-text"><b>${esc(m.name)}</b><small>직접 추가한 대회</small><span class="rl-dists"><span class="tag">${esc(distLabel(m.distance))}</span></span></span>
+          </button>
+          <button class="rl-done" onclick="openMyRaceSheet(${jsArg(m.id)})">신청 완료</button>
+        </div>`;
+    }
+
+    // ---------- ☆ 관심 대회 ----------
+    function raceById(id) { return (raceList || []).find(r => r.id === id) || (myRaces.find(m => m.race_id === id) || {}).race; }
+    async function toggleInterest(id) {
+      if (!requireLogin('관심 대회를 저장하려면 먼저 로그인해주세요.')) return;
+      const r = raceById(id);
+      if (!r) return;
+      const mine = myEntryFor(id);
+      if (mine && mine.status === 'interested') {
+        const { error } = await supabaseClient.from('my_races').delete().eq('id', mine.id);
+        if (error) { alert('해제하지 못했어요: ' + error.message); return; }
+        myRaces = myRaces.filter(m => m.id !== mine.id);
+      } else if (!mine) {
+        const dist = (r.distances || []).find(d => RACE_MAIN_DISTS.includes(d)) || (r.distances || [])[0] || 'Full';
+        const row = await insertMyRace({ race_id: r.id, name: r.name, race_date: r.race_date, distance: dist, status: 'interested' });
+        if (!row) return;
+        showRaceToast('관심 대회에 담았어요. 접수 일정을 챙겨볼게요');
+      }
+      afterMyRacesChanged();
+      if (raceSheetCtx && raceSheetCtx.race && raceSheetCtx.race.id === id && document.getElementById('race-sheet').style.display === 'flex') {
+        raceSheetCtx.mine = myEntryFor(id); renderRaceSheet();
+      }
+    }
+    async function insertMyRace(row) {
+      const { data, error } = await supabaseClient.from('my_races').insert({ user_id: currentUser.id, ...row }).select('*, race:races(*)').single();
+      if (error) {
+        alert(isMissingRelation(error, 'my_races') ? '대회 일정 기능이 아직 준비되지 않았어요. (Supabase에 races_setup.sql 실행 필요)'
+          : /duplicate|unique/i.test(error.message) ? '이미 담아둔 대회예요.' : '저장하지 못했어요: ' + error.message);
+        return null;
+      }
+      myRaces.push(data); sortMyRaces();
+      return data;
+    }
+
+    // ---------- 대회 창 ----------
+    function openRaceSheet(id) {
+      const r = raceById(id);
+      if (!r) return;
+      const mine = myEntryFor(r.id);
+      raceSheetCtx = { race: r, mine, dist: (mine && mine.distance) || (r.distances || []).find(d => RACE_MAIN_DISTS.includes(d)) || (r.distances || [])[0] || 'Full' };
+      renderRaceSheet();
+      document.getElementById('race-sheet').style.display = 'flex';
+    }
+    function openMyRaceSheet(myId) {
+      const m = myRaces.find(x => x.id === myId);
+      if (!m) return;
+      raceSheetCtx = { race: m.race || null, mine: m, dist: m.distance };
+      renderRaceSheet();
+      document.getElementById('race-sheet').style.display = 'flex';
+    }
+    function closeRaceSheet() { document.getElementById('race-sheet').style.display = 'none'; }
+    function setRaceSheetDist(d) { raceSheetCtx.dist = d; renderRaceSheet(); }
+    function renderRaceSheet() {
+      const { race: r, mine, dist } = raceSheetCtx;
+      const x = r || mine;
+      const registered = mine && mine.status === 'registered';
+      const interested = mine && mine.status === 'interested';
+      const past = isPastRace(x);
+      const cancelled = r && r.status === 'cancelled';
+      const dists = r ? (r.distances || []) : [mine.distance];
+      const home = r && safeUrl(r.homepage_url), apply = r && safeUrl(r.apply_url), src = r && safeUrl(r.source_url);
+      const a = applyInfo(r);
+      let applyBox = '';
+      if (r && !past && !cancelled && !registered) {
+        const period = r.apply_start || r.apply_end
+          ? `${r.apply_start ? r.apply_start.replace(/-/g, '.') + (r.apply_start_time ? ' ' + r.apply_start_time : '') : ''} ~ ${r.apply_end ? r.apply_end.replace(/-/g, '.') : ''}` : '';
+        const stateLine = !a ? '<span class="rs-muted">접수 일정 미정</span>'
+          : a.kind === 'soon' ? `<b class="rs-accent">접수 시작까지 ${a.days}일</b>`
+          : a.kind === 'open' ? `<b class="rs-accent">${esc(a.text)}</b>` : '<span class="rs-muted">접수 마감</span>';
+        applyBox = `<div class="rs-apply">${period ? `<div><b>접수</b> ${esc(period)}</div>` : ''}<div>${stateLine}${r.apply_type ? ` · ${esc(r.apply_type)}` : ''}</div></div>`;
+      }
+      const goal = registered && !past ? goalAttachments().get(mine.id) : null;
+      const showDists = !past && !cancelled && dists.length;
+      document.getElementById('race-sheet-body').innerHTML = `
+        <div class="rs-head">
+          <span class="mr-dday ${past && registered ? 'done' : ''} num">${past && registered ? '완주' : ddayText(x)}</span>
+          <div><div class="sheet-title">${esc(raceNameOf(x))}</div>
+          <div class="rs-meta">${esc(fmtRaceDate(x, true))}${r && r.region ? ` · ${esc(r.region)}` : ''}${r && r.place ? ` · ${esc(r.place)}` : ''}${!r ? ' · 직접 추가한 대회' : ''}</div></div>
+        </div>
+        ${cancelled ? '<p class="rs-note warn">이 대회는 취소됐어요.</p>' : ''}
+        ${r && r.status === 'tentative' ? '<p class="rs-note">날짜가 아직 확정되지 않았어요. 확정되면 자동으로 바뀌어요.</p>' : ''}
+        ${r && r.status === 'postponed' ? '<p class="rs-note warn">대회가 연기됐어요. 공식 안내를 확인해주세요.</p>' : ''}
+        ${r && r.note ? `<p class="rs-note">${esc(r.note)}</p>` : ''}
+        ${applyBox}
+        ${past && registered ? `<p class="rs-note">대회가 끝났어요. 기록증을 올리면 PB·목표가 바로 반영돼요.</p>` : ''}
+        ${goal ? `<p class="rs-note">이 대회에서 <b>${distLabel(mine.distance)} 목표 ${pdFmtTime(goal.target)}</b>에 도전해요.</p>` : ''}
+        ${showDists ? `<div class="fg rs-fg">
+          <span class="fg-label">${registered ? '내 종목' : '나갈 종목'}</span>
+          <div class="cat-buttons rs-dists">${dists.map(d => `<button type="button" class="cat-btn ${d === dist ? 'active' : ''}" onclick="setRaceSheetDist(${jsArg(d)})">${esc(distLabel(d))}</button>`).join('')}</div>
+        </div>` : ''}
+        <div class="rs-actions">
+          ${past && registered ? `<button class="btn btn-accent btn-block" onclick="startCertForRace(${jsArg(mine.id)})">기록증 올리기</button>` : ''}
+          ${!registered && !cancelled ? `<div class="rs-two">
+              <button class="btn btn-soft" onclick="toggleInterest(${r.id})">${interested ? '★ 관심 해제' : '☆ 관심 대회'}</button>
+              <button class="btn btn-accent" onclick="markRegistered()">신청했어요</button>
+            </div>` : ''}
+          ${registered && !past && dist !== mine.distance ? `<button class="btn btn-accent btn-block" onclick="changeMyRaceDist()">종목 바꾸기</button>` : ''}
+          ${(home || apply) && !past && !cancelled ? `<a class="btn btn-soft btn-block" href="${esc(apply || home)}" target="_blank" rel="noopener">${apply ? '접수 페이지 열기' : '대회 홈페이지 열기'}</a>` : ''}
+          ${registered ? `<button class="btn btn-block rs-del" onclick="removeMyRace()">일정 삭제</button>` : ''}
+        </div>
+        <div class="rs-links">
+          ${r ? `<button type="button" class="link-btn muted" onclick="openRaceReport()">정보가 달라요</button>` : ''}
+          ${src ? `<a class="link-btn muted" href="${esc(src)}" target="_blank" rel="noopener">정보 출처</a>` : ''}
+        </div>
+        ${r && !past ? '<p class="rs-foot">신청 전에 꼭 대회 공식 안내를 확인해주세요.</p>' : ''}`;
+    }
+    async function markRegistered() {
+      if (!requireLogin('나갈 대회로 저장하려면 먼저 로그인해주세요.')) return;
+      const { race: r, mine, dist } = raceSheetCtx;
+      if (mine) {
+        const { error } = await supabaseClient.from('my_races').update({ status: 'registered', distance: dist }).eq('id', mine.id);
+        if (error) { alert('저장하지 못했어요: ' + error.message); return; }
+        mine.status = 'registered'; mine.distance = dist;
+      } else if (!(await insertMyRace({ race_id: r.id, name: r.name, race_date: r.race_date, distance: dist, status: 'registered' }))) return;
+      closeRaceSheet();
+      afterMyRacesChanged();
+      showRaceToast(`${r.name} · ${distLabel(dist)} 나갈 대회에 넣었어요`);
+    }
+    async function changeMyRaceDist() {
+      const { mine, dist } = raceSheetCtx;
+      const { error } = await supabaseClient.from('my_races').update({ distance: dist }).eq('id', mine.id);
+      if (error) { alert('바꾸지 못했어요: ' + error.message); return; }
+      mine.distance = dist;
+      closeRaceSheet();
+      afterMyRacesChanged();
+    }
+    async function removeMyRace() {
+      const { mine } = raceSheetCtx;
+      if (!confirm('이 일정을 삭제할까요?\n대회 목록에서 언제든 다시 추가할 수 있어요.')) return;
+      const { error } = await supabaseClient.from('my_races').delete().eq('id', mine.id);
+      if (error) { alert('삭제하지 못했어요: ' + error.message); return; }
+      myRaces = myRaces.filter(m => m.id !== mine.id);
+      closeRaceSheet();
+      afterMyRacesChanged();
+    }
+    function afterMyRacesChanged() {
+      if (document.getElementById('race-list-modal').style.display === 'flex') renderRaceList();
+      if (currentMainView === 'profile') fillHomeRaces();
+    }
+    let raceToastTimer = null;
+    function showRaceToast(msg) {
+      const t = document.getElementById('race-toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(raceToastTimer);
+      raceToastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+    }
+
+    // ---------- 기록증 올리기: 나갈 대회 정보로 미리 채우기 ----------
+    function startCertForRace(myId) {
+      const m = myRaces.find(x => x.id === myId);
+      if (!m) return;
+      pendingRaceFill = { name: raceNameOf(m), date: raceDateOf(m), dist: m.distance };
+      closeRaceSheet();
+      openChoiceModal();
+    }
+    function applyPendingRaceFill() {
+      const p = pendingRaceFill;
+      if (!p) return;
+      const mark = (el) => { el.classList.remove('needs-check'); el.classList.add('prefilled'); el.addEventListener('input', () => el.classList.remove('prefilled'), { once: true }); };
+      const name = document.getElementById('form-name');
+      name.value = p.name; mark(name);
+      if (p.date) { const d = document.getElementById('form-date'); d.value = p.date; mark(d); }
+      if (RACE_KM[p.dist]) { selectCategory(p.dist, RACE_KM[p.dist]); document.getElementById('cat-buttons-wrap').classList.remove('needs-check'); }
+      const note = document.getElementById('race-fill-note');
+      if (note) note.style.display = 'block';
+    }
+    function clearPendingRaceFill() {
+      pendingRaceFill = null;
+      const note = document.getElementById('race-fill-note');
+      if (note) note.style.display = 'none';
+      document.querySelectorAll('#record-form .prefilled').forEach(el => el.classList.remove('prefilled'));
+    }
+
+    // ---------- 저장 후 결과 화면 ----------
+    function agBestOf(list) {
+      if (!agePrivate || !agePrivate.birth_year || !agePrivate.gender) return null;
+      let best = null;
+      list.forEach(r => {
+        const cat = catBucket(r.category, r.distanceKm), sec = secOf(r);
+        if (!AG_CATS.includes(cat) || sec <= 0) return;
+        const g = ageGrade(sec, cat, agePrivate.gender, ageAt(r.date, agePrivate.birth_year));
+        if (g && (!best || g.pct > best)) best = g.pct;
+      });
+      return best;
+    }
+    async function showRaceResult(rec, recordsBefore) {
+      const cat = catBucket(rec.category, rec.distanceKm);
+      const sec = secOf(rec);
+      const label = CAT_LABEL[cat] || rec.category;
+      const same = recordsBefore.filter(r => catBucket(r.category, r.distanceKm) === cat && secOf(r) > 0);
+      const prevBest = same.length ? Math.min(...same.map(secOf)) : null;
+      const count = same.length + 1;
+      // 목표 (달성했으면 기록하고 축하 화면은 여기서 대신 보여준다)
+      let goal = null, achieved = false;
+      if (typeof goalsAvailable !== 'undefined' && goalsAvailable) {
+        await loadMyGoals();
+        goal = myGoals.get(cat) || null;
+        if (goal && sec <= goal.target) achieved = Boolean(await checkGoalAchieved(rec, true));
+      }
+      // 러너 등급
+      await loadAgePrivate();
+      const ageReady = agePrivate && agePrivate.birth_year && agePrivate.gender;
+      const thisAg = ageReady && AG_CATS.includes(cat) ? ageGrade(sec, cat, agePrivate.gender, ageAt(rec.date, agePrivate.birth_year)) : null;
+      const before = ageReady ? agBestOf(recordsBefore) : null;
+      const after = ageReady ? agBestOf(records) : null;
+      const promoted = before != null && after != null && agTier(after)[3] > agTier(before)[3];
+      // 다음 같은 종목 대회
+      await loadMyRaces();
+      const next = myRaces.find(m => m.status === 'registered' && m.distance === cat && raceDateOf(m) && raceDateOf(m) > rec.date && daysUntil(raceDateOf(m)) >= 0);
+
+      const isPb = prevBest != null && sec < prevBest;
+      const first = prevBest == null;
+      let headline;
+      if (promoted) headline = `<div class="res-tier"><span class="tier-chip big t${agTier(after)[3]}">${agTier(after)[1]}</span></div><h2 class="res-title accent">${agTier(after)[1]}로 승급했어요!</h2>`;
+      else if (isPb) headline = '<h2 class="res-title accent">새 PB예요!</h2>';
+      else if (first) headline = `<h2 class="res-title accent">첫 ${esc(label)} 완주예요!</h2>`;
+      else headline = '<h2 class="res-title">완주 기록을 저장했어요</h2>';
+
+      const cards = [];
+      if (isPb) cards.push(`<div class="res-card"><div><b>PB</b><small>이전 ${pdFmtTime(prevBest)}</small></div><span class="res-up">${fmtGap(prevBest - sec)} 단축</span></div>`);
+      else if (first) cards.push(`<div class="res-card"><div><b>PB ${pdFmtTime(sec)}</b><small>첫 기록이 바로 PB예요</small></div><span>${esc(label)} 첫 완주</span></div>`);
+      else cards.push(`<div class="res-card"><div><b>PB ${pdFmtTime(prevBest)}</b><small>이번 기록과 ${fmtGap(sec - prevBest)} 차이</small></div><span>${esc(label)} 완주 ${count}회째</span></div>`);
+      if (goal) {
+        cards.push(achieved || sec <= goal.target
+          ? `<div class="res-card"><div><b>목표 ${pdFmtTime(goal.target)}</b><small>${goal.target - sec > 0 ? `목표보다 ${fmtGap(goal.target - sec)} 빨라요` : '목표 기록 그대로 해냈어요'}</small></div><span class="res-up">달성 ✓</span></div>`
+          : `<div class="res-card"><div><b>목표 ${pdFmtTime(goal.target)}</b><small>${fmtGap(sec - goal.target)} 남았어요</small></div>${next ? `<span class="res-next">다음 ${esc(CAT_SHORT[cat])} 대회로 넘어가요</span>` : ''}</div>`);
+      }
+      if (thisAg) {
+        cards.push(`<div class="res-card"><div><b>러너 등급</b><small>이번 기록 ${thisAg.pct.toFixed(1)}점${after != null ? ` · 최고 ${before != null && after > before ? `${before.toFixed(1)}점 → ` : ''}${after.toFixed(1)}점` : ''}</small></div><span class="tier-chip t${agTier(after != null ? after : thisAg.pct)[3]}">${agTier(after != null ? after : thisAg.pct)[1]}</span></div>`);
+      } else if (!ageReady && AG_CATS.includes(cat)) {
+        cards.push(`<button class="res-card res-hint" onclick="closeRaceResult(); openAgeGrade();"><div><b>러너 등급</b><small>출생연도·성별을 넣으면 러너 등급을 볼 수 있어요</small></div><span>›</span></button>`);
+      }
+      const second = achieved ? `<button class="btn btn-soft" onclick="closeRaceResult(); openGoalModal(${jsArg(cat)})">새 목표 정하기</button>`
+        : goal ? `<button class="btn btn-soft" onclick="closeRaceResult(); openTrainingGuide(${jsArg(cat)}, ${goal.target})">훈련 페이스</button>`
+        : GOAL_CATS.includes(cat) ? `<button class="btn btn-soft" onclick="closeRaceResult(); openGoalModal(${jsArg(cat)})">목표 정하기</button>` : '';
+      document.getElementById('race-result-body').innerHTML = `
+        <div class="res-top"><div class="res-sub">${esc(rec.name)} · ${esc(label)}</div><div class="res-time num">${pdFmtTime(sec)}</div>${headline}</div>
+        <div class="res-cards">${cards.join('')}</div>
+        ${promoted && isPb ? '<p class="res-extra">새 PB도 함께 세웠어요.</p>' : ''}
+        <div class="res-btns ${second ? '' : 'one'}"><button class="btn btn-soft" onclick="closeRaceResult(); openPbModal();">PB 카드 공유</button>${second}</div>
+        <button class="btn btn-accent btn-block res-main" onclick="closeRaceResult(); openRaceList();">다음 대회 찾기</button>`;
+      document.getElementById('race-result').style.display = 'flex';
+    }
+    function closeRaceResult() { document.getElementById('race-result').style.display = 'none'; }
+
+    // ---------- 목록에 없는 대회 직접 추가 (+ 목록 추가 요청) ----------
+    let customDist = 'Full';
+    function openCustomRace() {
+      if (!requireLogin('대회를 추가하려면 먼저 로그인해주세요.')) return;
+      ['cr-name', 'cr-date', 'cr-region', 'cr-link'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('cr-name').value = raceQuery || '';
+      document.getElementById('cr-share').checked = true;
+      setCustomDist('Full');
+      document.getElementById('custom-race-modal').style.display = 'flex';
+    }
+    function closeCustomRace() { document.getElementById('custom-race-modal').style.display = 'none'; }
+    function setCustomDist(d) {
+      customDist = d;
+      document.querySelectorAll('#cr-dists .cat-btn').forEach(b => b.classList.toggle('active', b.dataset.d === d));
+    }
+    async function submitCustomRace(e) {
+      e.preventDefault();
+      const name = document.getElementById('cr-name').value.trim().slice(0, 80);
+      const date = document.getElementById('cr-date').value;
+      const region = document.getElementById('cr-region').value.trim().slice(0, 30);
+      const link = document.getElementById('cr-link').value.trim().slice(0, 300);
+      if (!name || !date) { alert('대회 이름과 날짜를 넣어주세요.'); return; }
+      const btn = document.getElementById('cr-submit');
+      btn.disabled = true;
+      try {
+        if (!(await insertMyRace({ race_id: null, name, race_date: date, distance: customDist, status: 'registered' }))) return;
+        if (document.getElementById('cr-share').checked) {
+          await supabaseClient.from('race_updates').insert({
+            action: 'add', submitted_by: currentUser.id, source_url: safeUrl(link),
+            payload: { name, race_date: date, region: region || null, distances: [customDist], homepage_url: safeUrl(link) }
+          });
+        }
+        closeCustomRace();
+        afterMyRacesChanged();
+        showRaceToast('나갈 대회에 넣었어요');
+      } finally { btn.disabled = false; }
+    }
+
+    // ---------- 정보가 달라요 ----------
+    function openRaceReport() {
+      if (!requireLogin('알려주시려면 먼저 로그인해주세요.')) return;
+      document.getElementById('rr-target').textContent = raceSheetCtx.race.name;
+      document.getElementById('rr-note').value = '';
+      document.getElementById('rr-link').value = '';
+      document.getElementById('race-report-modal').style.display = 'flex';
+    }
+    function closeRaceReport() { document.getElementById('race-report-modal').style.display = 'none'; }
+    async function submitRaceReport() {
+      const note = document.getElementById('rr-note').value.trim().slice(0, 500);
+      const link = document.getElementById('rr-link').value.trim().slice(0, 300);
+      if (!note) { alert('무엇이 다른지 적어주세요. (예: 날짜가 11월 16일로 바뀌었어요)'); return; }
+      const { error } = await supabaseClient.from('race_updates').insert({
+        race_id: raceSheetCtx.race.id, action: /취소/.test(note) ? 'cancel' : 'change', payload: {}, note,
+        source_url: safeUrl(link), submitted_by: currentUser.id
+      });
+      if (error) { alert('보내지 못했어요: ' + error.message); return; }
+      closeRaceReport();
+      showRaceToast('알려주셔서 고마워요. 확인 후 고칠게요');
+    }
+
+    // ---------- 관리자: 검토 대기 ----------
+    async function openRaceAdmin() {
+      document.getElementById('race-admin-modal').style.display = 'flex';
+      const root = document.getElementById('race-admin-root');
+      root.innerHTML = '<div class="loading">불러오는 중…</div>';
+      const { data, error } = await supabaseClient.from('race_updates').select('*, race:races(name, race_date, race_month)')
+        .eq('status', 'pending').order('created_at', { ascending: true }).limit(300);
+      if (error) { root.innerHTML = emptyHtml('불러오지 못했어요', esc(error.message)); return; }
+      if (!data.length) { root.innerHTML = emptyHtml('검토할 항목이 없어요', '러너 제보나 정기 조사 결과가 생기면 여기에 쌓여요.'); return; }
+      const ACT = { add: '새 대회', change: '정보 변경', cancel: '취소' };
+      const FIELD = { name: '이름', race_date: '날짜', race_month: '예정월', region: '지역', place: '장소', distances: '종목', status: '상태', homepage_url: '홈페이지', apply_url: '접수', apply_start: '접수 시작', apply_start_time: '시작 시각', apply_end: '접수 마감', apply_type: '접수 방식', apply_state: '접수 상태', note: '메모' };
+      const autoAdds = data.filter(u => u.origin === 'auto' && u.action === 'add');
+      root.innerHTML = `<p class="ra-lead">${data.length}건 · [반영]을 누르면 대회 목록에 바로 들어가요. 메모만 있는 제보는 Table Editor에서 직접 고친 뒤 [처리 완료]를 눌러주세요.</p>
+        ${autoAdds.length > 1 ? `<div class="ra-bulk"><button class="btn btn-accent btn-block" onclick="bulkApplyAutoAdds(this)">정기 조사 새 대회 ${autoAdds.length}건 모두 반영</button></div>` : ''}` + data.map(u => {
+        const p = u.payload || {};
+        const keys = Object.keys(p).filter(k => p[k] !== null && p[k] !== '');
+        const fields = keys.map(k => `<div><span>${FIELD[k] || esc(k)}</span><b>${esc(Array.isArray(p[k]) ? p[k].map(distLabel).join(', ') : String(p[k]))}</b></div>`).join('');
+        const src = safeUrl(u.source_url);
+        return `
+          <div class="ra-card" data-id="${esc(u.id)}" data-auto-add="${u.origin === 'auto' && u.action === 'add'}">
+            <div class="ra-top"><span class="tag">${ACT[u.action]}</span><span class="ra-origin">${u.origin === 'auto' ? '정기 조사' : '러너 제보'} · ${esc(String(u.created_at).slice(0, 10))}</span></div>
+            ${u.race ? `<div class="ra-race">${esc(u.race.name)} <small>${esc(fmtRaceDate(u.race))}</small></div>` : ''}
+            ${fields ? `<div class="ra-fields">${fields}</div>` : ''}
+            ${u.note ? `<p class="ra-note">${esc(u.note)}</p>` : ''}
+            ${src ? `<a class="link-btn muted" href="${esc(src)}" target="_blank" rel="noopener">출처 열기</a>` : ''}
+            <div class="ra-btns">
+              <button class="btn btn-soft" onclick="reviewRaceUpdate(${jsArg(u.id)}, false, this)">무시</button>
+              <button class="btn btn-accent" onclick="reviewRaceUpdate(${jsArg(u.id)}, true, this)">${keys.length || u.action === 'cancel' ? '반영' : '처리 완료'}</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+    function closeRaceAdmin() { document.getElementById('race-admin-modal').style.display = 'none'; }
+    async function reviewRaceUpdate(id, apply, btn) {
+      const card = btn.closest('.ra-card');
+      card.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      const { error } = await supabaseClient.rpc('pbpb_review_race_update', { p_id: id, p_apply: apply });
+      if (error) { alert('처리하지 못했어요: ' + error.message); card.querySelectorAll('button').forEach(b => { b.disabled = false; }); return false; }
+      card.classList.add('ra-done');
+      card.querySelector('.ra-btns').innerHTML = `<span class="ra-result">${apply ? '반영했어요' : '무시했어요'}</span>`;
+      raceList = null;   // 다음에 열 때 새로 불러오기
+      return true;
+    }
+    async function bulkApplyAutoAdds(btn) {
+      const cards = [...document.querySelectorAll('.ra-card[data-auto-add="true"]:not(.ra-done)')];
+      if (!cards.length || !confirm(`정기 조사로 찾은 새 대회 ${cards.length}건을 모두 대회 목록에 넣을까요?`)) return;
+      btn.disabled = true;
+      let ok = 0;
+      for (const c of cards) if (await reviewRaceUpdate(c.dataset.id, true, c.querySelector('.btn-accent'))) ok++;
+      btn.textContent = `${ok}건 반영했어요`;
+    }
 
     function openCertDirectViewer(url, title) {
       if (!isSafeUrl(url)) return;
