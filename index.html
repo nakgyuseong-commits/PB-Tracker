@@ -1169,12 +1169,21 @@
     .pd-disclaimer { font-size: 12.5px; color: var(--sub); }
     .menu-group { font-size: 13px; font-weight: 700; color: var(--sub); padding: 8px 8px 2px; }
     .menu-divider { height: 1px; background: var(--line); margin: 8px 0; }
+    /* 베타 표시 */
+    .beta-badge { flex-shrink: 0; align-self: center; margin-left: 2px; margin-right: auto; font-size: 10.5px; font-weight: 800; letter-spacing: .5px; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 6px; padding: 1px 5px; line-height: 1.3; }
+    .beta-strip { display: flex; align-items: center; gap: 8px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; padding: 8px 8px 8px 16px; }
+    .beta-strip[hidden] { display: none; }
+    .beta-strip span { flex: 1; min-width: 0; line-height: 1.45; }
+    .beta-strip a { color: var(--accent); font-weight: 800; text-decoration: underline; white-space: nowrap; }
+    .beta-strip button { width: 36px; height: 36px; border: 0; background: none; color: var(--accent); font-size: 18px; flex-shrink: 0; }
+    .menu-meta { margin-left: auto; font-size: 12px; color: var(--muted); font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <button id="topbar-title" class="topbar-logo" onclick="switchMainView('profile')" aria-label="pbpb 홈(내 기록실)으로"><span class="logo-mark" aria-hidden="true">pb</span><span class="logo-word" aria-hidden="true">pb</span></button>
+      <span class="beta-badge" aria-label="베타 서비스">BETA</span>
       <span id="topbar-label" class="topbar-label" hidden></span>
       <div class="topbar-actions">
         <button id="topbar-search" class="icon-btn" aria-label="러너 찾기" onclick="switchMainView('runners')">
@@ -1186,6 +1195,11 @@
         <button id="topbar-login" class="btn btn-accent btn-sm" onclick="openAuthModal('login')" hidden>로그인</button>
       </div>
     </header>
+    <div id="beta-strip" class="beta-strip" role="note" hidden>
+      <span>베타 서비스예요. 불편한 점을 알려주세요</span>
+      <a href="mailto:pbpb.runner@gmail.com?subject=%5BPBPB%20%EC%9D%98%EA%B2%AC%5D" onclick="event.preventDefault(); openFeedbackMail();">의견 보내기</a>
+      <button type="button" aria-label="베타 안내 닫기" onclick="closeBetaStrip()">✕</button>
+    </div>
 
     <main>
       <section id="view-feed">
@@ -1981,6 +1995,7 @@
       <button class="menu-item" id="menu-race-admin" style="display:none;" onclick="closeProfileMenu(); openRaceAdmin();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l2 2 4-4"/><path d="M5 4h14v16H5z"/></svg>대회 정보 검토 (관리자)</button>
       <button class="menu-item" onclick="closeProfileMenu(); openPolicyPage('terms');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>이용약관</button>
       <button class="menu-item" onclick="closeProfileMenu(); openPolicyPage('privacy');"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>개인정보처리방침</button>
+      <button class="menu-item" onclick="closeProfileMenu(); openFeedbackMail();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg>의견 보내기<span class="menu-meta">베타</span></button>
       <button class="menu-item danger" id="menu-logout" onclick="closeProfileMenu(); handleAuthBtnClick();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10"/></svg>로그아웃</button>
       <button type="button" class="sheet-cancel" onclick="closeProfileMenu()">닫기</button>
     </div>
@@ -5789,6 +5804,7 @@
       await initAuthListener();
       watchLayersForBack();
       initMaskDrawing();
+      initBetaStrip();
       await syncFromCloud();
       switchMainView('profile');
       checkRaceAdmin();
@@ -6481,6 +6497,27 @@
       let ok = 0;
       for (const c of cards) if (await reviewRaceUpdate(c.dataset.id, true, c.querySelector('.btn-accent'))) ok++;
       btn.textContent = `${ok}건 반영했어요`;
+    }
+
+    // ========================================================
+    // 베타 안내 · 의견 보내기 (공식 메일)
+    // ========================================================
+    const PBPB_MAIL = 'pbpb.runner@gmail.com';
+    function feedbackMailto() {
+      const body = '불편한 점이나 바라는 점을 자유롭게 적어주세요.\n\n(어느 화면에서 어떤 일이 있었는지 적어주시면 더 빨리 고칠 수 있어요)\n';
+      return `mailto:${PBPB_MAIL}?subject=${encodeURIComponent('[PBPB 의견]')}&body=${encodeURIComponent(body)}`;
+    }
+    function openFeedbackMail() { location.href = feedbackMailto(); }
+    function initBetaStrip() {
+      let seen = false;
+      try { seen = localStorage.getItem('pbpb_beta_seen') === '1'; } catch (e) {}
+      const el = document.getElementById('beta-strip');
+      if (el) el.hidden = seen;
+    }
+    function closeBetaStrip() {
+      try { localStorage.setItem('pbpb_beta_seen', '1'); } catch (e) {}
+      const el = document.getElementById('beta-strip');
+      if (el) el.hidden = true;
     }
 
     function openCertDirectViewer(url, title) {
